@@ -15,7 +15,7 @@ if(!isset($_SESSION['status']) || $_SESSION['status'] != "login"){ header("locat
     
     <script src="assets/js/pdf.min.js"></script>
     <script>
-        // Set Worker ke File Lokal
+        // Pastikan path ini sesuai dengan struktur folder Anda
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/js/pdf.worker.min.js';
     </script>
     
@@ -30,256 +30,311 @@ if(!isset($_SESSION['status']) || $_SESSION['status'] != "login"){ header("locat
         .main-content { margin-left: 280px; padding: 30px; transition: 0.3s; }
         @media (max-width: 768px) { .main-content { margin-left: 0; padding-top: 80px; } }
         
-        /* Style untuk Kartu Drag & Drop */
-        .pdf-card {
-            cursor: grab; transition: transform 0.2s, box-shadow 0.2s; position: relative;
-            background: var(--bs-body-bg); border: 1px solid var(--bs-border-color);
+        .pdf-card { 
+            position: relative; 
+            width: 150px; 
+            margin: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            background: #fff;
+            cursor: move;
+            transition: transform 0.2s;
         }
-        .pdf-card:active { cursor: grabbing; transform: scale(1.02); }
-        .pdf-thumbnail {
-            width: 100%; height: 180px; object-fit: contain; background-color: #525659;
-            border-bottom: 1px solid var(--bs-border-color);
+        .pdf-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .pdf-thumb { height: 180px; width: 100%; background: #f8f9fa; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .pdf-thumb canvas { width: 100%; height: auto; object-fit: contain; }
+        .pdf-info { padding: 8px; font-size: 12px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: #fff; border-top: 1px solid #eee; }
+        .btn-remove { 
+            position: absolute; top: 5px; right: 5px; 
+            background: rgba(220, 53, 69, 0.9); color: white; 
+            border: none; border-radius: 50%; width: 24px; height: 24px; 
+            font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
-        .btn-remove-card {
-            position: absolute; top: 5px; right: 5px; z-index: 10;
-            background: rgba(220, 53, 69, 0.9); color: white; border: none;
-            width: 25px; height: 25px; border-radius: 50%; display: flex;
-            align-items: center; justify-content: center; font-size: 12px;
+        .drag-area { 
+            border: 2px dashed #0d6efd; 
+            border-radius: 10px; 
+            background-color: rgba(13, 110, 253, 0.05); 
+            transition: all 0.3s;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
-        .btn-remove-card:hover { background: #dc3545; }
-        .ghost-class { opacity: 0.5; background: #c8ebfb; border: 2px dashed #0d6efd; }
+        .drag-area.active { background-color: rgba(13, 110, 253, 0.15); border-color: #0a58ca; }
+        
+        /* Grid Container untuk Sortable */
+        #pdfGrid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            min-height: 100px;
+            padding: 10px;
+            align-items: flex-start;
+        }
     </style>
 </head>
 <body>
 
-<?php include 'sidebar_menu.php'; ?>
+    <?php include 'sidebar_menu.php'; ?>
 
-<div class="main-content">
-    <div class="container-fluid">
-        
-        <h4 class="fw-bold mb-4"><i class="bi bi-tools me-2 text-primary"></i>PDF Tools Internal</h4>
+    <div class="main-content">
+        <div class="container-fluid">
+            <h4 class="fw-bold mb-4"><i class="bi bi-file-earmark-pdf-fill me-2 text-primary"></i>Gabungkan PDF (Merge)</h4>
 
-        <div class="card shadow-sm border-0 rounded-4">
-            <div class="card-header bg-transparent border-0 pt-4 px-4">
-                <ul class="nav nav-pills nav-fill gap-2 p-1 bg-body-secondary rounded-pill" id="pills-tab" role="tablist">
-                    <li class="nav-item">
-                        <button class="nav-link active rounded-pill fw-bold" id="pills-merge-tab" data-bs-toggle="pill" data-bs-target="#pills-merge">
-                            <i class="bi bi-files me-2"></i> Gabung PDF (Merge)
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link rounded-pill fw-bold" id="pills-split-tab" data-bs-toggle="pill" data-bs-target="#pills-split">
-                            <i class="bi bi-scissors me-2"></i> Pisah PDF (Split)
-                        </button>
-                    </li>
-                </ul>
-            </div>
-            
-            <div class="card-body p-4">
-                <div class="tab-content" id="pills-tabContent">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
                     
-                    <div class="tab-pane fade show active" id="pills-merge">
-                        
-                        <div class="text-center mb-4">
-                            <input type="file" id="pdfInput" class="d-none" accept=".pdf" multiple onchange="handleFiles(this.files)">
-                            
-                            <button type="button" class="btn btn-outline-primary btn-lg rounded-pill px-5 border-2 fw-bold" onclick="document.getElementById('pdfInput').click()">
-                                <i class="bi bi-plus-circle me-2"></i> Pilih File PDF
-                            </button>
-                            <div class="form-text mt-2">Klik tombol untuk menambah file. Geser kartu (drag) untuk mengubah urutan.</div>
+                    <div class="alert alert-info d-flex align-items-center mb-4">
+                        <i class="bi bi-info-circle-fill me-2 fs-4"></i>
+                        <div>
+                            <strong>Cara Penggunaan:</strong>
+                            <ul class="mb-0 ps-3">
+                                <li>Upload file PDF yang ingin digabungkan.</li>
+                                <li>Geser (Drag & Drop) kotak file untuk mengatur urutan halaman.</li>
+                                <li>Maksimal upload <strong>20 File</strong> sekaligus (Keterbatasan Server).</li>
+                            </ul>
                         </div>
-
-                        <div id="pdfGrid" class="row g-3 mb-4">
-                            <div class="col-12 text-center py-5" id="emptyState">
-                                <i class="bi bi-grid-3x3-gap fs-1 text-muted opacity-25"></i>
-                                <p class="text-muted mt-2">Belum ada file dipilih.</p>
-                            </div>
-                        </div>
-
-                        <div class="d-grid justify-content-center" id="actionArea" style="display:none;">
-                            <button type="button" onclick="processMerge()" id="btnMerge" class="btn btn-primary btn-lg rounded-pill shadow-sm px-5">
-                                <i class="bi bi-download me-2"></i> Gabung & Download PDF
-                            </button>
-                            <div id="loadingText" class="text-center mt-2 text-primary" style="display:none;">
-                                <div class="spinner-border spinner-border-sm me-2"></div> Sedang memproses & menggabungkan...
-                            </div>
-                        </div>
-
                     </div>
 
-                    <div class="tab-pane fade" id="pills-split">
-                        <div class="row justify-content-center">
-                            <div class="col-md-8">
-                                <form action="proses_tools.php" method="POST" enctype="multipart/form-data">
-                                    <input type="hidden" name="aksi" value="split">
-                                    <div class="mb-4">
-                                        <label class="form-label fw-bold">1. Upload File PDF</label>
-                                        <input type="file" name="file_source" class="form-control" accept=".pdf" required>
-                                    </div>
-                                    <div class="mb-4">
-                                        <label class="form-label fw-bold">2. Halaman yang Diambil</label>
-                                        <input type="text" name="range" class="form-control" placeholder="Contoh: 1-5, 8, 10" required>
-                                        <div class="form-text">Contoh: <b>1-3</b> (Ambil hal 1 s.d 3), atau <b>1,5</b> (Ambil hal 1 dan 5 saja).</div>
-                                    </div>
-                                    <div class="d-grid">
-                                        <button type="submit" class="btn btn-success btn-lg rounded-pill">
-                                            <i class="bi bi-scissors me-2"></i> Potong PDF
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
+                    <div class="drag-area p-5 text-center mb-4" id="dropArea">
+                        <i class="bi bi-cloud-arrow-up text-primary" style="font-size: 50px;"></i>
+                        <h5 class="mt-3 fw-bold">Drag & Drop File PDF Di Sini</h5>
+                        <p class="text-muted">atau</p>
+                        <button class="btn btn-primary rounded-pill px-4 fw-bold" onclick="document.getElementById('fileInput').click()">Pilih File</button>
+                        <input type="file" id="fileInput" multiple accept=".pdf" hidden>
+                    </div>
+
+                    <div id="pdfGrid" class="border rounded bg-light mb-4">
+                        <div class="text-muted w-100 text-center py-5" id="emptyText">Belum ada file yang dipilih.</div>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button class="btn btn-outline-danger px-4 rounded-pill" onclick="resetFiles()">
+                            <i class="bi bi-trash me-1"></i> Reset
+                        </button>
+                        <button id="btnMerge" class="btn btn-success px-4 rounded-pill fw-bold" onclick="mergeFiles()">
+                            <i class="bi bi-files me-1"></i> Gabungkan PDF
+                        </button>
+                    </div>
+
+                    <div id="loadingText" class="text-center mt-3" style="display:none;">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 fw-bold text-primary">Sedang memproses, mohon tunggu...</p>
                     </div>
 
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Penyimpanan File Object Global
+        let fileStorage = []; 
+        const dropArea = document.getElementById("dropArea");
+        const fileInput = document.getElementById("fileInput");
+        const pdfGrid = document.getElementById("pdfGrid");
+        const emptyText = document.getElementById("emptyText");
 
-<script>
-    let fileStorage = [];
+        // Inisialisasi SortableJS
+        new Sortable(pdfGrid, {
+            animation: 150,
+            ghostClass: 'bg-primary-subtle'
+        });
 
-    // Init Sortable (Library Lokal)
-    var el = document.getElementById('pdfGrid');
-    var sortable = Sortable.create(el, {
-        animation: 150,
-        ghostClass: 'ghost-class'
-    });
+        // Event Listeners Drag & Drop
+        dropArea.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            dropArea.classList.add("active");
+        });
 
-    // 1. HANDLE FILES
-    function handleFiles(files) {
-        const emptyState = document.getElementById('emptyState');
-        const actionArea = document.getElementById('actionArea');
-        const grid = document.getElementById('pdfGrid');
+        dropArea.addEventListener("dragleave", () => {
+            dropArea.classList.remove("active");
+        });
 
-        if(files.length > 0) {
-            emptyState.style.display = 'none';
-            actionArea.style.display = 'grid';
+        dropArea.addEventListener("drop", (event) => {
+            event.preventDefault();
+            dropArea.classList.remove("active");
+            handleFiles(event.dataTransfer.files);
+        });
+
+        fileInput.addEventListener("change", () => {
+            handleFiles(fileInput.files);
+        });
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                emptyText.style.display = "none";
+                Array.from(files).forEach(file => {
+                    if (file.type === "application/pdf") {
+                        addFileToGrid(file);
+                    } else {
+                        alert("File " + file.name + " bukan PDF!");
+                    }
+                });
+            }
         }
 
-        Array.from(files).forEach(file => {
-            if(file.type !== 'application/pdf') {
-                alert("File " + file.name + " bukan PDF."); return;
-            }
+        // Fungsi Menambah File ke Grid & Storage
+        function addFileToGrid(file) {
+            // Buat ID Unik
+            const id = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            
+            // Simpan ke array global
+            fileStorage.push({ id: id, file: file });
 
-            const uniqueId = 'pdf_' + Math.random().toString(36).substr(2, 9);
-            fileStorage.push({ id: uniqueId, file: file });
-
-            const col = document.createElement('div');
-            col.className = 'col-6 col-md-4 col-lg-3';
-            col.setAttribute('data-id', uniqueId);
-            col.innerHTML = `
-                <div class="card pdf-card h-100 overflow-hidden shadow-sm">
-                    <button class="btn-remove-card" onclick="removeCard('${uniqueId}')" title="Hapus">&times;</button>
-                    <div class="pdf-thumbnail d-flex align-items-center justify-content-center text-white">
-                        <div class="spinner-border spinner-border-sm"></div>
-                    </div>
-                    <div class="card-body p-2 text-center bg-light">
-                        <small class="fw-bold d-block text-truncate" title="${file.name}">${file.name}</small>
-                        <span class="badge bg-secondary" style="font-size: 0.65rem;">${(file.size/1024/1024).toFixed(2)} MB</span>
-                    </div>
+            // Buat Elemen HTML
+            const div = document.createElement("div");
+            div.className = "pdf-card";
+            div.setAttribute("data-id", id);
+            div.innerHTML = `
+                <button class="btn-remove" onclick="removeFile('${id}')">&times;</button>
+                <div class="pdf-thumb" id="thumb-${id}">
+                    <div class="spinner-border spinner-border-sm text-secondary"></div>
                 </div>
+                <div class="pdf-info" title="${file.name}">${file.name}</div>
             `;
-            grid.appendChild(col);
-            generateThumbnail(file, col.querySelector('.pdf-thumbnail'));
-        });
-        document.getElementById('pdfInput').value = '';
-    }
+            pdfGrid.appendChild(div);
 
-    // 2. GENERATE THUMBNAIL (PDF.js Lokal)
-    function generateThumbnail(file, container) {
-        const fileReader = new FileReader();
-        fileReader.onload = function() {
-            const typedarray = new Uint8Array(this.result);
+            // Generate Thumbnail
+            generateThumbnail(file, id);
+        }
 
-            pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
-                pdf.getPage(1).then(function(page) {
-                    const viewport = page.getViewport({ scale: 0.5 });
+        // Fungsi Hapus File
+        window.removeFile = function(id) {
+            // Hapus dari DOM
+            const el = document.querySelector(`div[data-id="${id}"]`);
+            if(el) el.remove();
+
+            // Hapus dari Array Storage
+            fileStorage = fileStorage.filter(f => f.id !== id);
+
+            // Cek jika kosong
+            if(fileStorage.length === 0) emptyText.style.display = "block";
+        }
+
+        // Fungsi Reset Semua
+        window.resetFiles = function() {
+            pdfGrid.innerHTML = '<div class="text-muted w-100 text-center py-5" id="emptyText">Belum ada file yang dipilih.</div>';
+            emptyText.style.display = "block";
+            fileStorage = [];
+            fileInput.value = "";
+        }
+
+        // Generate Thumbnail PDF dengan PDF.js
+        function generateThumbnail(file, id) {
+            const fileReader = new FileReader();
+            fileReader.onload = function() {
+                const typedarray = new Uint8Array(this.result);
+                
+                pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+                    return pdf.getPage(1); // Ambil halaman 1
+                }).then(page => {
+                    const scale = 0.5;
+                    const viewport = page.getViewport({ scale: scale });
+                    
                     const canvas = document.createElement('canvas');
                     const context = canvas.getContext('2d');
-                    
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
-                    canvas.style.width = '100%';
-                    canvas.style.height = '100%';
-                    canvas.style.objectFit = 'contain';
 
                     const renderContext = {
                         canvasContext: context,
                         viewport: viewport
                     };
                     
-                    page.render(renderContext).promise.then(function() {
-                        container.innerHTML = '';
-                        container.appendChild(canvas);
+                    page.render(renderContext).promise.then(() => {
+                        const thumbContainer = document.getElementById(`thumb-${id}`);
+                        if(thumbContainer) {
+                            thumbContainer.innerHTML = '';
+                            thumbContainer.appendChild(canvas);
+                        }
                     });
+                }).catch(err => {
+                    console.error("Error render PDF:", err);
+                    const thumbContainer = document.getElementById(`thumb-${id}`);
+                    if(thumbContainer) thumbContainer.innerHTML = '<small class="text-danger">Error Preview</small>';
                 });
-            }).catch(err => {
-                container.innerHTML = '<span class="small text-danger">Error Preview</span>';
+            };
+            fileReader.readAsArrayBuffer(file);
+        }
+
+        // --- PROSES MERGE (DIPERBAIKI) ---
+        window.mergeFiles = function() {
+            // 1. Validasi Jumlah File
+            const gridItems = document.querySelectorAll('#pdfGrid > div[data-id]');
+            if(gridItems.length < 2) {
+                alert("Pilih minimal 2 file PDF untuk digabungkan!");
+                return;
+            }
+
+            // 2. Peringatan Batas Server (Standard PHP limit is 20)
+            if(gridItems.length > 20) {
+                if(!confirm("Peringatan: Anda mencoba menggabungkan " + gridItems.length + " file.\nBatas upload server biasanya 20 file. File berlebih mungkin akan hilang.\n\nLanjutkan?")) {
+                    return;
+                }
+            }
+
+            const btn = document.getElementById('btnMerge');
+            const loading = document.getElementById('loadingText');
+            btn.disabled = true;
+            loading.style.display = 'block';
+
+            const formData = new FormData();
+            formData.append('aksi', 'merge_ajax');
+
+            // 3. Loop berdasarkan urutan visual di GRID (DOM)
+            // Ini penting agar urutan file sesuai dengan yang disusun user
+            let fileCount = 0;
+            gridItems.forEach(item => {
+                const id = item.getAttribute('data-id');
+                // Cari file asli di array penyimpanan
+                const fileObj = fileStorage.find(f => f.id === id);
+                
+                if(fileObj && fileObj.file) {
+                    formData.append('files[]', fileObj.file);
+                    fileCount++;
+                }
             });
-        };
-        fileReader.readAsArrayBuffer(file);
-    }
 
-    // 3. HAPUS KARTU
-    function removeCard(id) {
-        const element = document.querySelector(`[data-id="${id}"]`);
-        if(element) element.remove();
-        fileStorage = fileStorage.filter(item => item.id !== id);
-        if(fileStorage.length === 0) {
-            document.getElementById('emptyState').style.display = 'block';
-            document.getElementById('actionArea').style.display = 'none';
+            console.log("Mengirim " + fileCount + " file ke server...");
+
+            // 4. Kirim ke Server
+            fetch('proses_tools.php', { method: 'POST', body: formData })
+            .then(response => {
+                if(!response.ok) {
+                    throw new Error("Gagal terhubung ke server (Code: " + response.status + "). Mungkin ukuran file terlalu besar.");
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Cek jika blob terlalu kecil (kemungkinan pesan error teks, bukan PDF)
+                if(blob.size < 100) {
+                     // Opsional: Baca blob sebagai text untuk melihat error PHP jika ada
+                     return blob.text().then(text => { throw new Error("Respon Server: " + text); });
+                }
+
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "Merged_" + new Date().getTime() + ".pdf";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                
+                btn.disabled = false;
+                loading.style.display = 'none';
+            })
+            .catch(err => {
+                alert("Terjadi Kesalahan:\n" + err.message + "\n\nTips: Coba kurangi jumlah file atau ukuran file.");
+                btn.disabled = false;
+                loading.style.display = 'none';
+                console.error(err);
+            });
         }
-    }
-
-    // 4. PROSES MERGE
-    function processMerge() {
-        if(fileStorage.length < 2) {
-            alert("Pilih minimal 2 file!"); return;
-        }
-
-        const btn = document.getElementById('btnMerge');
-        const loading = document.getElementById('loadingText');
-        btn.disabled = true;
-        loading.style.display = 'block';
-
-        const formData = new FormData();
-        formData.append('aksi', 'merge_ajax');
-
-        const gridItems = document.querySelectorAll('#pdfGrid > div[data-id]');
-        gridItems.forEach(item => {
-            const id = item.getAttribute('data-id');
-            const fileObj = fileStorage.find(f => f.id === id);
-            if(fileObj) formData.append('files[]', fileObj.file);
-        });
-
-        fetch('proses_tools.php', { method: 'POST', body: formData })
-        .then(response => {
-            if(response.ok) return response.blob();
-            throw new Error('Gagal memproses');
-        })
-        .then(blob => {
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "Merged_" + new Date().getTime() + ".pdf";
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            
-            btn.disabled = false;
-            loading.style.display = 'none';
-        })
-        .catch(err => {
-            alert("Error: " + err.message);
-            btn.disabled = false;
-            loading.style.display = 'none';
-        });
-    }
-</script>
-
+    </script>
 </body>
 </html>
