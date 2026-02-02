@@ -10,9 +10,7 @@ $id_user = $_SESSION['id_user'];
 $role    = $_SESSION['role'];
 
 // --- 1. OTOMATISASI STATUS RETENSI (AUTO-CHECK) ---
-// Sistem otomatis mengubah status menjadi 'inaktif' jika tanggal retensi sudah lewat hari ini
 mysqli_query($koneksi, "UPDATE documents SET status_retensi = 'inaktif' WHERE tgl_retensi < CURDATE() AND status_retensi = 'aktif'");
-// ---------------------------------------------------------------
 
 // --- FUNGSI WARNA KATEGORI ---
 function getBadgeColor($cat){
@@ -27,25 +25,20 @@ function getBadgeColor($cat){
     }
 }
 
-// 2. CONFIG FILTER PRIVASI (FIXED AMBIGUOUS COLUMN)
-// Kita tambahkan 'd.' di depan id_user agar tidak bentrok dengan tabel users
+// 2. CONFIG FILTER PRIVASI
+// Gunakan alias 'd.' karena kita akan menggunakan JOIN
 $filter_user = ($role != 'admin') ? " AND (d.visibility='public' OR d.id_user='$id_user') " : "";
 
 // 3. QUERY STATISTIK (Semua tabel documents dialiaskan sebagai 'd')
-// A. Total Arsip
 $q_all = "SELECT COUNT(*) as total FROM documents d WHERE 1=1 $filter_user";
 $d_all = mysqli_fetch_assoc(mysqli_query($koneksi, $q_all));
 
-// B. Dokumen Terbaru (30 Hari)
 $q_new = "SELECT COUNT(*) as total FROM documents d WHERE d.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) $filter_user";
 $d_new = mysqli_fetch_assoc(mysqli_query($koneksi, $q_new));
 
-// C. Upload Saya (User Only)
-// Query ini aman karena tidak pakai filter_user (spesifik id_user)
 $q_my  = "SELECT COUNT(*) as total FROM documents WHERE id_user='$id_user'";
 $d_my  = mysqli_fetch_assoc(mysqli_query($koneksi, $q_my));
 
-// D. Total User (Admin Only)
 $d_user['total'] = 0;
 if($role == 'admin'){
     $q_usr = "SELECT COUNT(*) as total FROM users";
@@ -53,27 +46,40 @@ if($role == 'admin'){
     $d_user['total'] = $d_usr['total'];
 }
 
-// E. Arsip Aktif
 $q_aktif = "SELECT COUNT(*) as total FROM documents d WHERE d.status_retensi='aktif' $filter_user";
 $d_aktif = mysqli_fetch_assoc(mysqli_query($koneksi, $q_aktif));
 
-// F. Arsip Inaktif
 $q_inaktif = "SELECT COUNT(*) as total FROM documents d WHERE d.status_retensi='inaktif' $filter_user";
 $d_inaktif = mysqli_fetch_assoc(mysqli_query($koneksi, $q_inaktif));
 
-// 4. QUERY TABEL DATA (LIMIT 5 TERBARU)
-// JOIN aman karena filter menggunakan 'd.id_user'
+
+// 4. QUERY TABEL DATA & PENCARIAN
+// =========================================================
+$cari = isset($_GET['cari']) ? mysqli_real_escape_string($koneksi, $_GET['cari']) : "";
+$filter_cari = "";
+$limit_query = " LIMIT 5"; // Default: cuma tampilkan 5
+
+// Jika User Melakukan Pencarian
+if(!empty($cari)){
+    $filter_cari = " AND (d.judul LIKE '%$cari%' OR d.nomor_surat LIKE '%$cari%' OR d.kategori LIKE '%$cari%') ";
+    $limit_query = ""; // Hapus limit agar semua hasil pencarian muncul
+    $judul_tabel = "Hasil Pencarian: \"$cari\"";
+} else {
+    $judul_tabel = "5 Dokumen Terakhir";
+}
+
 $query = "SELECT d.*, u.nama_lengkap AS uploader 
           FROM documents d
           JOIN users u ON d.id_user = u.id_user
-          WHERE 1=1 $filter_user
-          ORDER BY d.created_at DESC LIMIT 5";
+          WHERE 1=1 $filter_user $filter_cari
+          ORDER BY d.created_at DESC $limit_query";
+
 $exec = mysqli_query($koneksi, $query);
 
-// Cek error jika query utama gagal
 if (!$exec) {
     die("Query Error: " . mysqli_error($koneksi));
 }
+// =========================================================
 ?>
 
 <!DOCTYPE html>
@@ -113,10 +119,13 @@ if (!$exec) {
                 </div>
                 <div class="col-md-6">
                     <div class="position-relative search-container">
-                        <form action="data_dokumen.php" method="GET" id="search-form">
+                        <form action="" method="GET" id="search-form">
                             <div class="input-group">
                                 <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-                                <input type="text" name="cari" id="search-input" class="form-control border-start-0 ps-0" placeholder="Cari dokumen cepat (AJAX)..." autocomplete="off">
+                                <input type="text" name="cari" id="search-input" class="form-control border-start-0 ps-0" placeholder="Cari dokumen..." value="<?php echo htmlspecialchars($cari); ?>" autocomplete="off">
+                                <?php if(!empty($cari)){ ?>
+                                    <a href="dashboard.php" class="btn btn-outline-secondary" title="Reset"><i class="bi bi-x-lg"></i></a>
+                                <?php } ?>
                                 <button class="btn btn-primary" type="submit">Cari</button>
                             </div>
                         </form>
@@ -125,6 +134,7 @@ if (!$exec) {
                 </div>
             </div>
 
+            <?php if(empty($cari)) { ?>
             <div class="row g-3 mb-4">
                 <div class="col-md-3">
                     <div class="card border-0 shadow-sm rounded-4 h-100 bg-primary text-white">
@@ -173,11 +183,16 @@ if (!$exec) {
                     <?php } ?>
                 </div>
             </div>
+            <?php } ?>
 
             <div class="card border-0 shadow-sm rounded-4">
                 <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
-                    <h6 class="fw-bold mb-0 text-secondary"><i class="bi bi-clock-history me-2"></i>5 Dokumen Terakhir</h6>
-                    <a href="data_dokumen.php" class="btn btn-sm btn-outline-primary rounded-pill px-3">Lihat Semua</a>
+                    <h6 class="fw-bold mb-0 text-secondary">
+                        <i class="bi bi-clock-history me-2"></i><?php echo $judul_tabel; ?>
+                    </h6>
+                    <?php if(empty($cari)){ ?>
+                        <a href="data_dokumen.php" class="btn btn-sm btn-outline-primary rounded-pill px-3">Lihat Semua</a>
+                    <?php } ?>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -197,12 +212,10 @@ if (!$exec) {
                                 if(mysqli_num_rows($exec) > 0){
                                     $no=1;
                                     while($row = mysqli_fetch_assoc($exec)){
-                                        // Badge Visibility
                                         $vis_badge = ($row['visibility'] == 'public') 
                                             ? '<i class="bi bi-globe text-success" title="Publik"></i>' 
                                             : '<i class="bi bi-lock-fill text-danger" title="Private"></i>';
 
-                                        // Badge Retensi
                                         $ret_badge = ($row['status_retensi'] == 'aktif') 
                                             ? '<span class="badge bg-success bg-opacity-10 text-success px-2 py-1">Aktif</span>'
                                             : '<span class="badge bg-danger bg-opacity-10 text-danger px-2 py-1">Inaktif</span>';
@@ -243,7 +256,7 @@ if (!$exec) {
                                 <?php 
                                     }
                                 } else {
-                                    echo "<tr><td colspan='6' class='text-center py-4 text-muted'>Belum ada dokumen yang diupload.</td></tr>";
+                                    echo "<tr><td colspan='6' class='text-center py-4 text-muted'>Tidak ada dokumen ditemukan.</td></tr>";
                                 }
                                 ?>
                             </tbody>
@@ -273,7 +286,7 @@ if (!$exec) {
     
     <script>
         $(document).ready(function(){
-            // 1. EVENT KETIK DI SEARCH
+            // 1. EVENT KETIK
             $("#search-input").keyup(function(){
                 var query = $(this).val();
                 if(query != "" && query.length > 1){
@@ -291,7 +304,7 @@ if (!$exec) {
                 }
             });
 
-            // 2. KLIK HASIL SUGESTI
+            // 2. KLIK SUGGESTION
             $(document).on('click', '#suggesstion-box li', function(){
                 var val = $(this).data('search'); 
                 $("#search-input").val(val);
@@ -299,7 +312,7 @@ if (!$exec) {
                 $("#search-form").submit(); 
             });
 
-            // 3. TUTUP SUGESTI JIKA KLIK LUAR
+            // 3. TUTUP JIKA KLIK LUAR
             $(document).click(function(e) {
                 if (!$(e.target).closest('.search-container').length) {
                     $('#suggesstion-box').hide();
