@@ -32,6 +32,7 @@ if(mysqli_num_rows($cek_duplikat) > 0){
     
     echo "<script>
             alert('$pemberitahuan');
+            // Jika admin, kembalikan ke tanda_tangan.php agar bisa pilih ulang atau dokumen lain
             window.location='tanda_tangan.php';
           </script>";
     exit;
@@ -46,6 +47,7 @@ $file_url = (file_exists($path_signed) ? $path_signed : "uploads/doc_asli/" . $d
 <head>
     <title>Multi & Resize TTD - SARSIP</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     
     <style>
@@ -76,25 +78,71 @@ $file_url = (file_exists($path_signed) ? $path_signed : "uploads/doc_asli/" . $d
 
     <div class="container-fluid">
         <div class="row">
-            <div class="col-md-3 bg-light border-end p-3 d-flex flex-column" style="height: 100vh;">
+            <div class="col-md-3 bg-light border-end p-3 d-flex flex-column" style="height: 100vh; overflow-y: auto;">
+                
+                <?php if($_SESSION['role'] == 'admin'): ?>
+                <div class="card mb-3 border-warning shadow-sm">
+                    <div class="card-body bg-warning bg-opacity-10 p-2">
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="bi bi-person-badge-fill text-warning fs-4 me-2"></i>
+                            <div class="lh-1">
+                                <span class="fw-bold small text-dark d-block">Mode Administrator</span>
+                                <small class="text-muted" style="font-size: 11px;">Pilih penandatangan:</small>
+                            </div>
+                        </div>
+                        <form>
+                            <select class="form-select form-select-sm border-warning text-dark" 
+                                    onchange="window.location.href='?id=<?php echo $id_doc; ?>&ttd_as='+this.value">
+                                
+                                <option value="<?php echo $_SESSION['id_user']; ?>" <?php if($signer_id == $_SESSION['id_user']) echo 'selected'; ?>>
+                                    -- Saya Sendiri (<?php echo $_SESSION['nama']; ?>) --
+                                </option>
+
+                                <?php
+                                // Ambil semua user aktif
+                                $q_users = mysqli_query($koneksi, "SELECT * FROM users WHERE status_aktif='1' ORDER BY nama_lengkap ASC");
+                                
+                                while($u = mysqli_fetch_array($q_users)){
+                                    // Skip admin login agar tidak duplikat dengan opsi "Saya Sendiri"
+                                    if($u['id_user'] == $_SESSION['id_user']) continue;
+
+                                    // Cek apakah user ini SUDAH tanda tangan di dokumen ini?
+                                    $cek_sudah = mysqli_query($koneksi, "SELECT * FROM doc_signers WHERE id_doc='$id_doc' AND id_user='".$u['id_user']."'");
+                                    $is_signed = mysqli_num_rows($cek_sudah) > 0;
+                                    
+                                    $selected = ($u['id_user'] == $signer_id) ? 'selected' : '';
+                                    
+                                    // Jika user sudah tanda tangan, disable pilihannya agar tidak dipilih lagi
+                                    $disabled = ($is_signed) ? 'disabled' : ''; 
+                                    $label_status = ($is_signed) ? ' (Sudah TTD)' : '';
+                                    
+                                    echo "<option value='".$u['id_user']."' $selected $disabled>".$u['nama_lengkap']." $label_status</option>";
+                                }
+                                ?>
+                            </select>
+                        </form>
+                    </div>
+                </div>
+                <hr class="my-2">
+                <?php endif; ?>
+
                 <h5 class="fw-bold" style="color: var(--primary-orange);">Posisi TTD</h5>
-                <hr>
                 
                 <div class="mb-3">
                     <label class="fw-bold small text-muted">Judul Dokumen:</label>
-                    <p class="lh-sm mb-0"><?php echo $data['judul']; ?></p>
+                    <p class="lh-sm mb-0 small"><?php echo $data['judul']; ?></p>
                 </div>
 
-                <div class="alert alert-warning py-2 mb-3 shadow-sm">
-                    <small class="fw-bold text-dark">Penandatangan:</small><br>
-                    <span class="text-primary"><?php echo $signer_name; ?></span>
+                <div class="alert alert-primary py-2 mb-3 shadow-sm">
+                    <small class="fw-bold text-dark">Penandatangan Aktif:</small><br>
+                    <span class="text-primary fw-bold"><?php echo $signer_name; ?></span>
                 </div>
 
                 <div class="mb-3">
-                    <label class="fw-bold">Navigasi & Zoom</label>
+                    <label class="fw-bold small">Navigasi & Zoom</label>
                     <div class="d-flex justify-content-between align-items-center mt-1 mb-2">
                         <button class="btn btn-sm btn-outline-dark" id="prev-page">← Prev</button>
-                        <span id="page-info" class="fw-bold">Page 1</span>
+                        <span id="page-info" class="fw-bold small">Page 1</span>
                         <button class="btn btn-sm btn-outline-dark" id="next-page">Next →</button>
                     </div>
                     <div class="btn-group w-100">
@@ -104,18 +152,18 @@ $file_url = (file_exists($path_signed) ? $path_signed : "uploads/doc_asli/" . $d
                 </div>
 
                 <div class="mb-3 p-2 bg-white border rounded">
-                    <label class="fw-bold text-success">+ Tambah Tanda Tangan</label>
-                    <button class="btn btn-success w-100 mt-1" onclick="addMarker()">
-                        Letakkan QR Baru
+                    <label class="fw-bold text-success small">+ Tambah QR Code</label>
+                    <button class="btn btn-success btn-sm w-100 mt-1" onclick="addMarker()">
+                        <i class="bi bi-qr-code"></i> Letakkan QR Baru
                     </button>
-                    <small class="text-muted d-block mt-2 lh-sm" style="font-size: 0.8em;">
+                    <small class="text-muted d-block mt-2 lh-sm" style="font-size: 0.75em;">
                         * Geser kotak kuning untuk memindah.<br>
                         * Tarik pojok kanan bawah merah untuk resize.<br>
                         * Klik kanan untuk menghapus.
                     </small>
                 </div>
 
-                <div class="mt-auto">
+                <div class="mt-auto pb-3">
                     <form action="proses_ttd.php" method="POST" id="form-ttd">
                         <input type="hidden" name="signer_id" value="<?php echo $signer_id; ?>">
                         
@@ -123,8 +171,10 @@ $file_url = (file_exists($path_signed) ? $path_signed : "uploads/doc_asli/" . $d
                         <input type="hidden" name="proses_ttd" value="1">
                         <input type="hidden" name="qr_list" id="input-qr-list">
                         
-                        <button type="button" onclick="simpanSemua()" class="btn btn-primary w-100 py-3 fw-bold">💾 SIMPAN POSISI</button>
-                        <a href="tanda_tangan.php" class="btn btn-link text-danger w-100 text-center">Batal</a>
+                        <button type="button" onclick="simpanSemua()" class="btn btn-primary w-100 py-3 fw-bold shadow">
+                            <i class="bi bi-floppy-fill me-2"></i> SIMPAN POSISI
+                        </button>
+                        <a href="tanda_tangan.php" class="btn btn-link text-danger w-100 text-center mt-2">Batal / Kembali</a>
                     </form>
                 </div>
             </div>
@@ -190,7 +240,7 @@ $file_url = (file_exists($path_signed) ? $path_signed : "uploads/doc_asli/" . $d
             pageMarkers.forEach(m => {
                 var el = document.createElement('div');
                 el.className = 'qr-marker';
-                el.innerHTML = 'QR';
+                el.innerHTML = '<i class="bi bi-qr-code"></i>';
                 el.id = 'marker-' + m.id;
                 
                 // Hitung Posisi & Ukuran Pixel berdasarkan Canvas saat ini
@@ -202,6 +252,7 @@ $file_url = (file_exists($path_signed) ? $path_signed : "uploads/doc_asli/" . $d
 
                 el.style.left = leftPos + 'px'; el.style.top  = topPos + 'px';
                 el.style.width = widthPx + 'px'; el.style.height = heightPx + 'px';
+                el.style.fontSize = (widthPx * 0.5) + 'px'; // Sesuaikan ukuran ikon
 
                 // Tambah Handle Resize
                 var handle = document.createElement('div');
@@ -267,6 +318,8 @@ $file_url = (file_exists($path_signed) ? $path_signed : "uploads/doc_asli/" . $d
 
                     // Terapkan Width & Height (Square)
                     markerEl.style.width = newWidth + 'px'; markerEl.style.height = newWidth + 'px';
+                    markerEl.style.fontSize = (newWidth * 0.5) + 'px'; // Update icon size
+
                     // Update Data
                     markerData.w_percent = newWidth / canvas.width; 
                     markerData.h_percent = newWidth / canvas.height; // Height percent mengikuti width pixel yang sama
@@ -309,7 +362,7 @@ $file_url = (file_exists($path_signed) ? $path_signed : "uploads/doc_asli/" . $d
             // Masukkan JSON ke Input Hidden
             document.getElementById('input-qr-list').value = JSON.stringify(finalData);
 
-            if(confirm("Simpan " + markers.length + " tanda tangan?")) {
+            if(confirm("Simpan " + markers.length + " posisi tanda tangan?")) {
                 document.getElementById('form-ttd').submit();
             }
         }
