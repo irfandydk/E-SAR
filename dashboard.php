@@ -9,12 +9,12 @@ include 'config/koneksi.php';
 $id_user = $_SESSION['id_user'];
 $role    = $_SESSION['role'];
 
-// --- [FITUR BARU] 1. OTOMATISASI STATUS RETENSI (AUTO-CHECK) ---
+// --- 1. OTOMATISASI STATUS RETENSI (AUTO-CHECK) ---
 // Sistem otomatis mengubah status menjadi 'inaktif' jika tanggal retensi sudah lewat hari ini
 mysqli_query($koneksi, "UPDATE documents SET status_retensi = 'inaktif' WHERE tgl_retensi < CURDATE() AND status_retensi = 'aktif'");
 // ---------------------------------------------------------------
 
-// --- FUNGSI WARNA KATEGORI (FITUR LAMA) ---
+// --- FUNGSI WARNA KATEGORI ---
 function getBadgeColor($cat){
     switch($cat){
         case 'Surat Masuk': return 'bg-primary';       
@@ -27,20 +27,21 @@ function getBadgeColor($cat){
     }
 }
 
-// 2. CONFIG FILTER PRIVASI (FITUR LAMA)
-// User biasa hanya melihat dokumen Publik ATAU miliknya sendiri
-$filter_user = ($role != 'admin') ? " AND (visibility='public' OR id_user='$id_user') " : "";
+// 2. CONFIG FILTER PRIVASI (FIXED AMBIGUOUS COLUMN)
+// Kita tambahkan 'd.' di depan id_user agar tidak bentrok dengan tabel users
+$filter_user = ($role != 'admin') ? " AND (d.visibility='public' OR d.id_user='$id_user') " : "";
 
-// 3. QUERY STATISTIK (DITAMBAH STATUS RETENSI)
+// 3. QUERY STATISTIK (Semua tabel documents dialiaskan sebagai 'd')
 // A. Total Arsip
-$q_all = "SELECT COUNT(*) as total FROM documents WHERE 1=1 $filter_user";
+$q_all = "SELECT COUNT(*) as total FROM documents d WHERE 1=1 $filter_user";
 $d_all = mysqli_fetch_assoc(mysqli_query($koneksi, $q_all));
 
 // B. Dokumen Terbaru (30 Hari)
-$q_new = "SELECT COUNT(*) as total FROM documents WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) $filter_user";
+$q_new = "SELECT COUNT(*) as total FROM documents d WHERE d.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) $filter_user";
 $d_new = mysqli_fetch_assoc(mysqli_query($koneksi, $q_new));
 
-// C. Upload Saya
+// C. Upload Saya (User Only)
+// Query ini aman karena tidak pakai filter_user (spesifik id_user)
 $q_my  = "SELECT COUNT(*) as total FROM documents WHERE id_user='$id_user'";
 $d_my  = mysqli_fetch_assoc(mysqli_query($koneksi, $q_my));
 
@@ -52,23 +53,27 @@ if($role == 'admin'){
     $d_user['total'] = $d_usr['total'];
 }
 
-// --- [FITUR BARU] STATISTIK RETENSI ---
 // E. Arsip Aktif
-$q_aktif = "SELECT COUNT(*) as total FROM documents WHERE status_retensi='aktif' $filter_user";
+$q_aktif = "SELECT COUNT(*) as total FROM documents d WHERE d.status_retensi='aktif' $filter_user";
 $d_aktif = mysqli_fetch_assoc(mysqli_query($koneksi, $q_aktif));
 
 // F. Arsip Inaktif
-$q_inaktif = "SELECT COUNT(*) as total FROM documents WHERE status_retensi='inaktif' $filter_user";
+$q_inaktif = "SELECT COUNT(*) as total FROM documents d WHERE d.status_retensi='inaktif' $filter_user";
 $d_inaktif = mysqli_fetch_assoc(mysqli_query($koneksi, $q_inaktif));
-// --------------------------------------
 
 // 4. QUERY TABEL DATA (LIMIT 5 TERBARU)
+// JOIN aman karena filter menggunakan 'd.id_user'
 $query = "SELECT d.*, u.nama_lengkap AS uploader 
           FROM documents d
           JOIN users u ON d.id_user = u.id_user
           WHERE 1=1 $filter_user
           ORDER BY d.created_at DESC LIMIT 5";
 $exec = mysqli_query($koneksi, $query);
+
+// Cek error jika query utama gagal
+if (!$exec) {
+    die("Query Error: " . mysqli_error($koneksi));
+}
 ?>
 
 <!DOCTYPE html>
@@ -183,7 +188,8 @@ $exec = mysqli_query($koneksi, $query);
                                     <th>Nomor & Judul</th>
                                     <th>Kategori</th>
                                     <th>Pengunggah</th>
-                                    <th>Status Retensi</th> <th width="10%" class="text-center">Aksi</th>
+                                    <th>Status Retensi</th>
+                                    <th width="10%" class="text-center">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -196,7 +202,7 @@ $exec = mysqli_query($koneksi, $query);
                                             ? '<i class="bi bi-globe text-success" title="Publik"></i>' 
                                             : '<i class="bi bi-lock-fill text-danger" title="Private"></i>';
 
-                                        // Badge Retensi (BARU)
+                                        // Badge Retensi
                                         $ret_badge = ($row['status_retensi'] == 'aktif') 
                                             ? '<span class="badge bg-success bg-opacity-10 text-success px-2 py-1">Aktif</span>'
                                             : '<span class="badge bg-danger bg-opacity-10 text-danger px-2 py-1">Inaktif</span>';
@@ -301,7 +307,6 @@ $exec = mysqli_query($koneksi, $query);
             });
         });
 
-        // 4. FUNGSI PREVIEW MODAL
         function previewFile(url, title) {
             document.getElementById('pdfFrame').src = url + "#toolbar=0"; 
             document.getElementById('previewTitle').innerText = "Preview: " + title;
