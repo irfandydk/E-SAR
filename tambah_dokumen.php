@@ -6,7 +6,7 @@ if(!isset($_SESSION['status']) || $_SESSION['status'] != "login"){
 }
 include 'config/koneksi.php';
 
-// --- LOGIKA HAK AKSES KATEGORI (TETAP SAMA) ---
+// --- LOGIKA HAK AKSES KATEGORI ---
 $role = $_SESSION['role'];
 $allowed_cats = [];
 
@@ -59,12 +59,12 @@ $selected_cat = isset($_GET['kategori']) ? $_GET['kategori'] : '';
                 
                 <form action="proses_dokumen.php" method="POST" enctype="multipart/form-data">
                     
+                    <input type="hidden" name="aksi" value="tambah">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Kategori Dokumen</label>
                         <select name="kategori" id="kategoriSelect" class="form-select" onchange="updateForm()" required>
                             <option value="">-- Pilih Kategori --</option>
                             <?php 
-                            // Opsi Kategori Standar
                             $cats = ['Surat Masuk', 'Surat Keluar', 'SK', 'Surat Perintah', 'Surat Pernyataan', 
                                      'Arsip Keuangan', 'Arsip Operasi SAR', 'Arsip Sumberdaya', 'Arsip Lainnya'];
                             
@@ -123,6 +123,7 @@ $selected_cat = isset($_GET['kategori']) ? $_GET['kategori'] : '';
                             <div class="col-auto"><small class="text-muted ms-2">(Setelah ini status jadi Inaktif)</small></div>
                         </div>
                     </div>
+
                     <div class="mb-4">
                         <label class="form-label fw-bold">File Dokumen (PDF)</label>
                         <input type="file" name="file_dokumen" class="form-control" accept=".pdf" required>
@@ -146,7 +147,6 @@ $selected_cat = isset($_GET['kategori']) ? $_GET['kategori'] : '';
         var boxAsal = document.getElementById("boxAsalSurat");
         var boxTujuan = document.getElementById("boxTujuanSurat");
         
-        // Reset
         boxAsal.style.display = "none";
         boxTujuan.style.display = "none";
         document.getElementById("labelNomor").innerText = "Nomor Dokumen";
@@ -160,7 +160,6 @@ $selected_cat = isset($_GET['kategori']) ? $_GET['kategori'] : '';
             document.getElementById("labelNomor").innerText = "Nomor Surat";
         }
     }
-    // Jalankan saat load (jika ada selected category dari GET)
     window.onload = updateForm;
 </script>
 </body>
