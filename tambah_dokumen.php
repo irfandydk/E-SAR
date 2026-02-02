@@ -194,4 +194,5 @@ $selected_cat = isset($_GET['kategori']) ? $_GET['kategori'] : '';
         window.onload = updateForm;
     </script>
 </body>
+
 </html>
