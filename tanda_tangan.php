@@ -33,8 +33,6 @@ function getBadgeColor($cat){
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
     
     <style>
         body { background-color: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
@@ -42,9 +40,6 @@ function getBadgeColor($cat){
         .main-content { margin-left: 280px; padding: 30px; }
         .nav-pills .nav-link.active { background-color: #fd7e14; }
         .nav-pills .nav-link { color: #6c757d; }
-        
-        .select2-container .select2-selection--single { height: 31px !important; padding-top: 2px; font-size: 0.85rem; }
-        .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered { line-height: 1.5; }
         
         .signer-list { font-size: 0.75rem; margin-top: 4px; }
         .signer-badge { background-color: #e9ecef; color: #495057; border: 1px solid #dee2e6; padding: 1px 5px; border-radius: 4px; display: inline-block; margin-right: 2px; margin-bottom: 2px; }
@@ -100,13 +95,14 @@ function getBadgeColor($cat){
                                             <th width="5%">No</th>
                                             <th width="40%">Dokumen</th>
                                             <th width="15%">Kategori</th>
-                                            <th width="40%" class="text-center">Aksi Tanda Tangan</th>
+                                            <th width="40%" class="text-center">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <?php 
                                         $no=1;
                                         $sql = "SELECT * FROM documents WHERE 1=1";
+                                        // Jika bukan admin, hanya tampilkan dokumen miliknya sendiri (uploader)
                                         if($role_login != 'admin'){ $sql .= " AND uploader_id = '$id_user_login'"; }
                                         $sql .= " ORDER BY id_doc DESC";
                                         
@@ -114,6 +110,7 @@ function getBadgeColor($cat){
                                         while($d = mysqli_fetch_array($q)){
                                             $id_doc = $d['id_doc'];
                                             
+                                            // Cek siapa saja yang sudah tanda tangan
                                             $q_signers = mysqli_query($koneksi, "SELECT u.nama_lengkap, u.id_user FROM doc_signers ds JOIN users u ON ds.id_user = u.id_user WHERE ds.id_doc='$id_doc'");
                                             $signed_users = [];
                                             $ids_signed = [];
@@ -122,23 +119,10 @@ function getBadgeColor($cat){
                                                 $ids_signed[]   = $s['id_user'];
                                             }
 
+                                            // Filter: Jika User biasa sudah tanda tangan, sembunyikan baris ini (pindah ke riwayat)
                                             $me_signed = in_array($id_user_login, $ids_signed);
                                             if($role_login != 'admin' && $me_signed) continue; 
                                             
-                                            $dropdown_opts = "";
-                                            $admin_can_action = false;
-                                            
-                                            if($role_login == 'admin'){
-                                                $q_avail = mysqli_query($koneksi, "SELECT * FROM users WHERE id_user NOT IN (SELECT id_user FROM doc_signers WHERE id_doc='$id_doc') ORDER BY nama_lengkap ASC");
-                                                if(mysqli_num_rows($q_avail) > 0){
-                                                    $admin_can_action = true;
-                                                    while($u = mysqli_fetch_array($q_avail)){
-                                                        $dropdown_opts .= "<option value='".$u['id_user']."'>".$u['nama_lengkap']." (".$u['jabatan'].")</option>";
-                                                    }
-                                                }
-                                            }
-                                            if($role_login == 'admin' && !$admin_can_action) continue; 
-
                                             $file_url = "uploads/doc_asli/" . $d['file_path'];
                                         ?>
                                         <tr>
@@ -163,24 +147,9 @@ function getBadgeColor($cat){
                                                         <i class="bi bi-eye"></i>
                                                     </button>
 
-                                                    <?php if($role_login == 'admin'){ ?>
-                                                        <form action="form_ttd.php" method="GET" class="d-flex align-items-center gap-1" style="width: 280px;">
-                                                            <input type="hidden" name="id" value="<?php echo $id_doc; ?>">
-                                                            <div class="flex-grow-1">
-                                                                <select name="ttd_as" class="form-select form-select-sm select2-user" required>
-                                                                    <option value="">Pilih Penandatangan...</option>
-                                                                    <?php echo $dropdown_opts; ?>
-                                                                </select>
-                                                            </div>
-                                                            <button type="submit" class="btn btn-warning btn-sm text-white" title="Proses">
-                                                                <i class="bi bi-pen-fill"></i>
-                                                            </button>
-                                                        </form>
-                                                    <?php } else { ?>
-                                                        <a href="form_ttd.php?id=<?php echo $id_doc; ?>" class="btn btn-warning btn-sm text-white px-3 shadow-sm">
-                                                            <i class="bi bi-pen-fill me-1"></i> Tanda Tangani
-                                                        </a>
-                                                    <?php } ?>
+                                                    <a href="form_ttd.php?id=<?php echo $id_doc; ?>" class="btn btn-warning btn-sm text-white px-3 shadow-sm" title="Proses Tanda Tangan">
+                                                        <i class="bi bi-pen-fill me-1"></i> Tanda Tangani
+                                                    </a>
                                                 </div>
                                             </td>
                                         </tr>
@@ -276,24 +245,12 @@ function getBadgeColor($cat){
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
         $(document).ready(function() {
             var table = $('.table-datatable').DataTable({
-                "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/id.json" },
-                "drawCallback": function() { initSelect2(); }
+                "language": { "url": "//cdn.datatables.net/plug-ins/1.13.4/i18n/id.json" }
             });
-
-            function initSelect2() {
-                $('.select2-user').select2({
-                    theme: 'bootstrap-5',
-                    width: '100%',
-                    placeholder: 'Cari Nama...',
-                    dropdownParent: $('body')
-                });
-            }
-            initSelect2();
 
             $(document).on('click', '.btn-preview', function(){
                 var url = $(this).data('file');
