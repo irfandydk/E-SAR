@@ -8,8 +8,9 @@ if(!isset($_SESSION['status']) || $_SESSION['status'] != "login"){
 }
 
 $role = $_SESSION['role'];
-$aksi = isset($_REQUEST['aksi']) ? $_REQUEST['aksi'] : ''; // Menangkap aksi dari GET/POST
+$aksi = isset($_REQUEST['aksi']) ? $_REQUEST['aksi'] : ''; 
 
+// FUNGSI CEK HAK AKSES
 function is_allowed($role, $category){
     if($role == 'admin') return true;
     $map = [
@@ -25,12 +26,14 @@ function is_allowed($role, $category){
 // ----------------------------------------------------------------------
 // 1. PROSES SIMPAN BARU
 // ----------------------------------------------------------------------
-if($aksi == 'tambah' && isset($_POST['simpan'])){
+// PERBAIKAN: Menambahkan kondisi OR isset($_POST['simpan']) agar lebih robust
+if(($aksi == 'tambah' || isset($_POST['simpan'])) && isset($_POST['simpan'])){
     
     $kategori = mysqli_real_escape_string($koneksi, $_POST['kategori']);
     
+    // Cek Hak Akses
     if(!is_allowed($role, $kategori)){
-        echo "<script>alert('AKSES DITOLAK!'); window.location='tambah_dokumen.php';</script>"; exit;
+        echo "<script>alert('AKSES DITOLAK! Kategori tidak diizinkan untuk Role Anda.'); window.location='tambah_dokumen.php';</script>"; exit;
     }
 
     $nomor      = mysqli_real_escape_string($koneksi, $_POST['nomor']);
@@ -42,8 +45,8 @@ if($aksi == 'tambah' && isset($_POST['simpan'])){
     $id_user    = $_SESSION['id_user'];
     $tgl_upload = date('Y-m-d H:i:s');
 
-    // Logic Retensi
-    $retensi = $_POST['retensi'];
+    // LOGIC RETENSI
+    $retensi = isset($_POST['retensi']) ? $_POST['retensi'] : '5'; // Default 5 tahun jika kosong
     if($retensi == 'permanen'){
         $tgl_retensi = '9999-12-31'; 
     } else {
@@ -66,7 +69,6 @@ if($aksi == 'tambah' && isset($_POST['simpan'])){
             if(move_uploaded_file($tmp_name, $path_upload)){
                 $file_hash = hash_file('sha256', $path_upload);
 
-                // INSERT (Menggunakan id_user)
                 $query = "INSERT INTO documents 
                           (nomor_surat, judul, kategori, file_path, id_user, created_at, file_hash, visibility, asal_surat, tujuan_surat, tgl_retensi, status_retensi) 
                           VALUES 
@@ -75,16 +77,16 @@ if($aksi == 'tambah' && isset($_POST['simpan'])){
                 if(mysqli_query($koneksi, $query)){
                     header("location:data_dokumen.php?pesan=sukses");
                 } else {
-                    echo "Error DB: " . mysqli_error($koneksi);
+                    echo "Error Database: " . mysqli_error($koneksi);
                 }
             } else {
-                echo "<script>alert('Gagal Upload File!'); window.history.back();</script>";
+                echo "<script>alert('Gagal Upload File ke Folder!'); window.history.back();</script>";
             }
         } else {
-            echo "<script>alert('Hanya File PDF!'); window.history.back();</script>";
+            echo "<script>alert('Hanya File PDF yang diperbolehkan!'); window.history.back();</script>";
         }
     } else {
-        echo "<script>alert('Pilih file dulu!'); window.history.back();</script>";
+        echo "<script>alert('Silakan pilih file PDF!'); window.history.back();</script>";
     }
 }
 
@@ -98,7 +100,6 @@ elseif($aksi == 'update' && isset($_POST['update'])){
     $judul      = mysqli_real_escape_string($koneksi, $_POST['judul']);
     $kategori   = mysqli_real_escape_string($koneksi, $_POST['kategori']);
     $visibility = mysqli_real_escape_string($koneksi, $_POST['visibility']);
-    
     $asal       = isset($_POST['asal_surat']) ? mysqli_real_escape_string($koneksi, $_POST['asal_surat']) : NULL;
     $tujuan     = isset($_POST['tujuan_surat']) ? mysqli_real_escape_string($koneksi, $_POST['tujuan_surat']) : NULL;
 
@@ -108,7 +109,6 @@ elseif($aksi == 'update' && isset($_POST['update'])){
                      WHERE id_doc='$id_doc'";
     mysqli_query($koneksi, $query_update);
 
-    // Cek upload ulang file
     if(!empty($_FILES['file_dokumen']['name'])){
         $filename = $_FILES['file_dokumen']['name'];
         $tmp_name = $_FILES['file_dokumen']['tmp_name'];
@@ -131,7 +131,7 @@ elseif($aksi == 'update' && isset($_POST['update'])){
 }
 
 // ----------------------------------------------------------------------
-// 3. PROSES HAPUS SATUAN
+// 3. HAPUS SATUAN
 // ----------------------------------------------------------------------
 elseif($aksi == 'hapus' && isset($_GET['id'])){
     $id = mysqli_real_escape_string($koneksi, $_GET['id']);
@@ -151,89 +151,65 @@ elseif($aksi == 'hapus' && isset($_GET['id'])){
 }
 
 // ----------------------------------------------------------------------
-// 4. PROSES HAPUS SEKALIGUS (BULK DELETE)
+// 4. HAPUS BANYAK
 // ----------------------------------------------------------------------
-elseif(isset($_POST['aksi']) && $_POST['aksi'] == 'hapus_banyak'){
-    if(!empty($_POST['pilih'])){
-        foreach($_POST['pilih'] as $id){
-            $id = mysqli_real_escape_string($koneksi, $id);
-            
-            $q = mysqli_query($koneksi, "SELECT file_path FROM documents WHERE id_doc='$id'");
-            $d = mysqli_fetch_assoc($q);
-            
-            if($d){
-                $path1 = "uploads/doc_asli/".$d['file_path'];
-                $path2 = "uploads/doc_signed/SIGNED_".$d['file_path'];
-                if(file_exists($path1)) unlink($path1);
-                if(file_exists($path2)) unlink($path2);
-                
-                mysqli_query($koneksi, "DELETE FROM documents WHERE id_doc='$id'");
-            }
+elseif($aksi == 'hapus_banyak' && !empty($_POST['pilih'])){
+    foreach($_POST['pilih'] as $id){
+        $id = mysqli_real_escape_string($koneksi, $id);
+        $q = mysqli_query($koneksi, "SELECT file_path FROM documents WHERE id_doc='$id'");
+        $d = mysqli_fetch_assoc($q);
+        
+        if($d){
+            $path1 = "uploads/doc_asli/".$d['file_path'];
+            $path2 = "uploads/doc_signed/SIGNED_".$d['file_path'];
+            if(file_exists($path1)) unlink($path1);
+            if(file_exists($path2)) unlink($path2);
+            mysqli_query($koneksi, "DELETE FROM documents WHERE id_doc='$id'");
         }
-        header("location:data_dokumen.php?pesan=hapus_banyak");
-    } else {
-        header("location:data_dokumen.php?pesan=gagal_pilih");
     }
+    header("location:data_dokumen.php?pesan=hapus_banyak");
 }
 
 // ----------------------------------------------------------------------
-// 5. PROSES DOWNLOAD SEKALIGUS (ZIP)
+// 5. DOWNLOAD ZIP
 // ----------------------------------------------------------------------
-elseif(isset($_POST['aksi']) && $_POST['aksi'] == 'download_zip'){
-    if(!empty($_POST['pilih'])){
-        
-        $zip = new ZipArchive();
-        $zip_name = "Arsip_Terpilih_" . date('Ymd_His') . ".zip";
-        $zip_path = "uploads/" . $zip_name; // Simpan sementara di uploads/
-        
-        if ($zip->open($zip_path, ZipArchive::CREATE) !== TRUE) {
-            die("Gagal membuat file ZIP.");
-        }
+elseif($aksi == 'download_zip' && !empty($_POST['pilih'])){
+    $zip = new ZipArchive();
+    $zip_name = "Arsip_" . date('Ymd_His') . ".zip";
+    $zip_path = "uploads/" . $zip_name;
+    
+    if ($zip->open($zip_path, ZipArchive::CREATE) !== TRUE) {
+        die("Gagal membuat ZIP.");
+    }
 
-        foreach($_POST['pilih'] as $id){
-            $id = mysqli_real_escape_string($koneksi, $id);
-            $q = mysqli_query($koneksi, "SELECT file_path, judul FROM documents WHERE id_doc='$id'");
-            
-            if($r = mysqli_fetch_assoc($q)){
-                // Cek file mana yang ada (Signed atau Asli)
-                $path_asli   = "uploads/doc_asli/" . $r['file_path'];
-                $path_signed = "uploads/doc_signed/SIGNED_" . $r['file_path'];
-                
-                $file_to_add = file_exists($path_signed) ? $path_signed : (file_exists($path_asli) ? $path_asli : null);
+    foreach($_POST['pilih'] as $id){
+        $id = mysqli_real_escape_string($koneksi, $id);
+        $q = mysqli_query($koneksi, "SELECT file_path, judul FROM documents WHERE id_doc='$id'");
+        if($r = mysqli_fetch_assoc($q)){
+            $path_asli   = "uploads/doc_asli/" . $r['file_path'];
+            $path_signed = "uploads/doc_signed/SIGNED_" . $r['file_path'];
+            $file_to_add = file_exists($path_signed) ? $path_signed : (file_exists($path_asli) ? $path_asli : null);
 
-                if($file_to_add){
-                    // Bersihkan nama file agar aman di dalam ZIP
-                    $ext = pathinfo($r['file_path'], PATHINFO_EXTENSION);
-                    $clean_judul = preg_replace('/[^A-Za-z0-9_\- ]/', '', $r['judul']);
-                    $clean_judul = str_replace(' ', '_', $clean_judul);
-                    
-                    // Tambahkan ke ZIP dengan nama: JUDUL.pdf
-                    $zip->addFile($file_to_add, $clean_judul . "." . $ext);
-                }
+            if($file_to_add){
+                $ext = pathinfo($r['file_path'], PATHINFO_EXTENSION);
+                $clean_judul = preg_replace('/[^A-Za-z0-9_\- ]/', '', $r['judul']);
+                $zip->addFile($file_to_add, $clean_judul . "." . $ext);
             }
         }
-        $zip->close();
+    }
+    $zip->close();
 
-        // Download File ZIP
-        if (file_exists($zip_path)) {
-            header('Content-Type: application/zip');
-            header('Content-Disposition: attachment; filename="' . $zip_name . '"');
-            header('Content-Length: ' . filesize($zip_path));
-            readfile($zip_path);
-            
-            // Hapus file ZIP setelah didownload agar hemat storage
-            unlink($zip_path); 
-            exit;
-        } else {
-            echo "<script>alert('Gagal membuat ZIP atau file tidak ditemukan.'); window.location='data_dokumen.php';</script>";
-        }
-
-    } else {
-        header("location:data_dokumen.php?pesan=gagal_pilih");
+    if (file_exists($zip_path)) {
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="' . $zip_name . '"');
+        header('Content-Length: ' . filesize($zip_path));
+        readfile($zip_path);
+        unlink($zip_path); 
+        exit;
     }
 }
-
 else {
+    // Jika tidak ada aksi yang cocok, kembali ke halaman data
     header("location:data_dokumen.php");
 }
 ?>
