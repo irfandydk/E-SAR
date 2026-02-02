@@ -4,6 +4,7 @@ include 'config/koneksi.php';
 
 // Fungsi Format Tanggal Indonesia
 function tgl_indo($tanggal){
+    if(empty($tanggal) || $tanggal == '0000-00-00' || $tanggal == '0000-00-00 00:00:00') return "-";
     $bulan = array (
         1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
         'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
@@ -20,7 +21,7 @@ $id_doc_found = 0;
 $token = "";
 
 // ------------------------------------------------------------------
-// LOGIKA PHP VALIDASI (TETAP SAMA)
+// LOGIKA PHP VALIDASI
 // ------------------------------------------------------------------
 
 // A. JIKA VIA SCAN QR (TOKEN)
@@ -33,28 +34,61 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
                            users.jabatan, users.nip, users.instansi, 
                            documents.id_doc, documents.judul, documents.nomor_surat, documents.kategori, documents.file_path, documents.created_at as tgl_upload
                   FROM doc_signers
-                  JOIN users ON doc_signers.id_user = users.id_user
-                  JOIN documents ON doc_signers.id_doc = documents.id_doc
+                  LEFT JOIN users ON doc_signers.id_user = users.id_user
+                  LEFT JOIN documents ON doc_signers.id_doc = documents.id_doc
                   WHERE doc_signers.qr_token = '$token'";
         $res_internal = mysqli_query($koneksi, $q_internal);
         if (mysqli_num_rows($res_internal) > 0) {
             $isValid = true;
             $data = mysqli_fetch_assoc($res_internal);
+            
+            // Fallback user terhapus
+            if(empty($data['nama_penandatangan'])){
+                $data['nama_penandatangan'] = "User ID: ".$data['id_user']." (Terhapus)";
+                $data['jabatan'] = "-";
+            }
+
             $jenis_dokumen = "INTERNAL";
             $id_doc_found = $data['id_doc']; 
         }
     }
-
 }
 
-// B. JIKA VIA UPLOAD FILE -> DOKUMEN INTERNAL
-if (isset($_GET['doc_id'])) {
-    $id_doc = mysqli_real_escape_string($koneksi, $_GET['doc_id']);
+// B. JIKA VIA UPLOAD FILE (DARI INDEX.PHP)
+// PERBAIKAN: Menambahkan logika untuk menangani $_FILES dari index.php
+elseif (isset($_FILES['file_surat']) && is_uploaded_file($_FILES['file_surat']['tmp_name'])) {
+    
+    $file_tmp = $_FILES['file_surat']['tmp_name'];
+    $hash_upload = hash_file('sha256', $file_tmp);
+    
+    // Cari dokumen berdasarkan HASH
     $query = "SELECT documents.*, users.nama_lengkap, users.nip, users.jabatan, users.unit_kerja, users.instansi 
-              FROM documents JOIN users ON documents.uploader_id = users.id_user WHERE id_doc = '$id_doc'";
+              FROM documents 
+              LEFT JOIN users ON documents.uploader_id = users.id_user 
+              WHERE signed_file_hash = '$hash_upload' LIMIT 1";
+              
     $result = mysqli_query($koneksi, $query);
 
-    if (mysqli_num_rows($result) > 0) {
+    if ($result && mysqli_num_rows($result) > 0) {
+        $isValid = true;
+        $row = mysqli_fetch_assoc($result);
+        $data = $row;
+        $data['has_signed_version'] = !empty($row['signed_file_hash']);
+        $id_doc_found = $row['id_doc'];
+        $data['nama_penandatangan'] = $row['nama_lengkap'] ?? "Uploader (ID: ".$row['uploader_id'].")"; 
+        $data['signed_at']          = $row['created_at'];
+        $jenis_dokumen = "HASH";
+    }
+}
+
+// C. JIKA VIA GET DOC_ID (LEGACY SUPPORT)
+elseif (isset($_GET['doc_id'])) {
+    $id_doc = mysqli_real_escape_string($koneksi, $_GET['doc_id']);
+    $query = "SELECT documents.*, users.nama_lengkap, users.nip, users.jabatan, users.unit_kerja, users.instansi 
+              FROM documents LEFT JOIN users ON documents.uploader_id = users.id_user WHERE id_doc = '$id_doc'";
+    $result = mysqli_query($koneksi, $query);
+
+    if ($result && mysqli_num_rows($result) > 0) {
         $isValid = true;
         $row = mysqli_fetch_assoc($result);
         $data = $row;
@@ -67,14 +101,16 @@ if (isset($_GET['doc_id'])) {
 }
 
 
-
 // AMBIL HISTORY
 if ($isValid && ($jenis_dokumen == "INTERNAL" || $jenis_dokumen == "HASH")) {
     $q_history = "SELECT doc_signers.*, users.nama_lengkap, users.jabatan, users.nip 
-                  FROM doc_signers JOIN users ON doc_signers.id_user = users.id_user 
+                  FROM doc_signers LEFT JOIN users ON doc_signers.id_user = users.id_user 
                   WHERE id_doc = '$id_doc_found' ORDER BY signed_at ASC"; 
     $res_history = mysqli_query($koneksi, $q_history);
-    while($h = mysqli_fetch_assoc($res_history)){ $history[] = $h; }
+    while($h = mysqli_fetch_assoc($res_history)){ 
+        if(empty($h['nama_lengkap'])) $h['nama_lengkap'] = "User ID: ".$h['id_user']." (Terhapus)";
+        $history[] = $h; 
+    }
 
     if($jenis_dokumen == "HASH" && count($history) > 0){
         $last_signer = end($history); 
