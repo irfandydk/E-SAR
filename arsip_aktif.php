@@ -8,15 +8,23 @@ if(!isset($_SESSION['status']) || $_SESSION['status'] != "login"){
 }
 
 // --- LAZY UPDATE (Otomatis pindahkan yang kadaluarsa ke Inaktif) ---
+// Pastikan kolom tgl_retensi dan status_retensi sudah ada di tabel documents
 mysqli_query($koneksi, "UPDATE documents SET status_retensi = 'inaktif' WHERE tgl_retensi < CURDATE() AND status_retensi = 'aktif'");
 
 // Query Arsip Aktif
+// PERBAIKAN: Menggunakan ORDER BY created_at (bukan tgl_upload)
 $query = "SELECT documents.*, users.nama_lengkap 
           FROM documents 
           LEFT JOIN users ON documents.id_user = users.id_user 
           WHERE status_retensi = 'aktif' 
-          ORDER BY tgl_upload DESC";
+          ORDER BY created_at DESC";
+
 $result = mysqli_query($koneksi, $query);
+
+// Cek error query jika ada
+if (!$result) {
+    die("Query Error: " . mysqli_error($koneksi));
+}
 ?>
 
 <!DOCTYPE html>
@@ -72,16 +80,24 @@ $result = mysqli_query($koneksi, $query);
                                 while($row = mysqli_fetch_assoc($result)){
                                     
                                     // Hitung Sisa Waktu
-                                    $tgl_retensi = new DateTime($row['tgl_retensi']);
+                                    // Pastikan tgl_retensi tidak null
+                                    $tgl_retensi_str = $row['tgl_retensi'] ? $row['tgl_retensi'] : date('Y-m-d'); 
+                                    $tgl_retensi = new DateTime($tgl_retensi_str);
                                     $hari_ini    = new DateTime();
                                     
                                     if($row['tgl_retensi'] == '9999-12-31'){
                                         $sisa_waktu = "<span class='badge bg-primary badge-sisa'>Permanen</span>";
                                     } else {
                                         $jarak = $hari_ini->diff($tgl_retensi);
-                                        // Jika kurang dari 30 hari, beri warna merah (warning)
-                                        $warna = ($jarak->days < 30) ? 'bg-danger' : 'bg-success';
-                                        $sisa_waktu = "<span class='badge $warna badge-sisa'>".$jarak->days." Hari Lagi</span>";
+                                        // Jika expired (negatif) atau kurang dari 30 hari
+                                        $is_expired = ($tgl_retensi < $hari_ini);
+                                        
+                                        if ($is_expired) {
+                                            $sisa_waktu = "<span class='badge bg-danger badge-sisa'>Kadaluarsa</span>";
+                                        } else {
+                                            $warna = ($jarak->days < 30) ? 'bg-warning text-dark' : 'bg-success';
+                                            $sisa_waktu = "<span class='badge $warna badge-sisa'>".$jarak->days." Hari Lagi</span>";
+                                        }
                                     }
                             ?>
                             <tr>
