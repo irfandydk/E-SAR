@@ -1,0 +1,276 @@
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: 127.0.0.1
+-- Generation Time: Feb 02, 2026 at 02:20 PM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.2.12
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Database: `db_sarsip`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `app_settings`
+--
+
+CREATE TABLE `app_settings` (
+  `id` int(11) NOT NULL,
+  `logo_path` varchar(255) DEFAULT 'default_logo.png',
+  `nama_aplikasi` varchar(100) DEFAULT 'SARSIP',
+  `logo` varchar(255) DEFAULT NULL,
+  `kop_surat` varchar(255) DEFAULT NULL,
+  `nama_instansi` varchar(150) DEFAULT 'Kantor SAR Kelas A',
+  `nama_unit_kerja` varchar(150) DEFAULT NULL,
+  `alamat_instansi` text DEFAULT NULL,
+  `email_instansi` varchar(100) DEFAULT NULL,
+  `telepon_instansi` varchar(50) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `app_settings`
+--
+
+INSERT INTO `app_settings` (`id`, `logo_path`, `nama_aplikasi`, `logo`, `kop_surat`, `nama_instansi`, `nama_unit_kerja`, `alamat_instansi`, `email_instansi`, `telepon_instansi`) VALUES
+(1, 'logo_instansi.png', 'E-SAR (Elektronik-Sistem Arsip)', NULL, 'kop_surat.pdf', 'Badan Nasional Pencarian dan Pertolongan', 'Kantor Pencarian dan Pertolongan Kelas A Kendari', 'Jl Kapten Piere Tendean No.91 Kecamatan Baruga', 'Kendari@basarnas.go.id', '+62 4013196557');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `documents`
+--
+
+CREATE TABLE `documents` (
+  `id_doc` int(11) NOT NULL,
+  `judul` varchar(200) DEFAULT NULL,
+  `asal_surat` varchar(150) DEFAULT NULL,
+  `tujuan_surat` varchar(150) DEFAULT NULL,
+  `nomor_surat` varchar(100) DEFAULT NULL,
+  `kategori` enum('Surat Masuk','Surat Keluar','SK','Surat Perintah','Surat Pernyataan','Arsip Keuangan','Arsip Operasi SAR','Arsip Sumberdaya','Arsip Lainnya') DEFAULT NULL,
+  `visibility` enum('public','private') DEFAULT 'public',
+  `file_path` varchar(255) DEFAULT NULL,
+  `file_hash` varchar(64) DEFAULT NULL,
+  `signed_file_hash` varchar(64) DEFAULT NULL,
+  `uploader_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `documents`
+--
+
+INSERT INTO `documents` (`id_doc`, `judul`, `asal_surat`, `tujuan_surat`, `nomor_surat`, `kategori`, `visibility`, `file_path`, `file_hash`, `signed_file_hash`, `uploader_id`, `created_at`) VALUES
+(38, 'SURAT PERSETUJUAN UP TAHUN 2026', 'KPPN', '', '00001_UP_614816_2026-KPPN', 'Surat Masuk', 'public', 'SURAT_20260125080020_427.pdf', '265dabf526530d0de7a0730145b22a89646b1a41730656f41c8d3ad7be602361', '3e785c14d756367a37cbfb0f439fed530865c4e6fcefb361cdbb5455785bbd25', 1, '2026-01-25 07:00:20'),
+(39, 'SPM 001', '', '', '001T', 'Arsip Keuangan', 'public', 'ARSIP_20260125083324_557.pdf', '5ba8c5fd5b063fe40b4a79f9330b93d1f4abf71f7485754e734e138da8cd2fe8', '8f71180a640d57ada4dfa1e47e20b76a20e00e8561f6804231d4916b4243f943', 1, '2026-01-25 07:33:24'),
+(40, 'SKP 2024', '', '', '-', 'Arsip Lainnya', 'public', 'ARSIP_20260125085656_577.pdf', '713b279d965e7194ff14688e54ee039afee227a56dd1b29e30b6e50193dfeca0', '7ef0abc91e971bc4c6326a485be1dbb50e4368156378b05aaa60a1ef5d2a5068', 2, '2026-01-25 00:58:37'),
+(41, 'SPM', '', 'kppn', '001/SAR/I/2026', 'Surat Keluar', 'public', 'SURAT_20260125091803_661.pdf', '5ba8c5fd5b063fe40b4a79f9330b93d1f4abf71f7485754e734e138da8cd2fe8', 'f5f20c42783dd49e7b4361d8c962dea1e0793a1745724711615a88b6f05f0067', 1, '2026-01-25 01:18:03'),
+(42, 'surat perintah', '', '', '007/SAR/I/2026', 'Surat Perintah', 'public', 'SURAT_20260125125812_244.pdf', '39e0296c07c413478a91dfe53bfc429b339d5254bd1425a6d5ac9b99f91d55b2', NULL, 1, '2026-01-25 04:58:12'),
+(43, 'teasdasdawd', '', '', '31231231', 'Surat Pernyataan', 'public', 'SURAT_20260125130508_748.pdf', '53e1ba2462501c36fbe4c73175217863ccac8c310bbf7689338b4b5864a6fc33', '819f0452c7b60eb9c9fde190659dcad142997ee25cbce423a6405a9358e0404e', 1, '2026-01-25 05:05:08'),
+(44, 'arsip inshy', '', '', '2312312', 'Arsip Lainnya', 'private', 'ARSIP_20260125130715_422.pdf', 'f76cd1c798c29ae04744529d3b0251bce67c1bd97b9d8860f3d9f8da7a913fb4', 'c282ded867fe9e1aa1322b283f0a242b70b468cd22d6d7be8680aa50d9e92b17', 3, '2026-01-25 05:07:15'),
+(45, 'TES TES', '', '', '001/SAR/I/2026', 'Arsip Keuangan', 'private', 'ARSIP_20260125140257_932.pdf', 'b9fe34455f89d2be7a47cfa697fbe886e43ae36b6fc3f474ec1fa283994dd59a', '47693a2f261ed717567fded0c9eb96d01e155b751d2f733d6286d4892b5cc4b7', 1, '2026-01-25 06:02:57'),
+(46, 'permintaan pembayaran', 'ramad', '', '008/SAR/I/2026', 'Surat Masuk', 'private', 'SURAT_20260127150841_185.pdf', '058ca565e037099d687a1cc787caac11586a5da8cb572ead054f0c558c83dfea', NULL, 1, '2026-01-27 07:08:41'),
+(47, 'SPM 029T', '', 'kppn', '029T', 'Surat Keluar', 'private', 'SURAT_20260127150925_414.pdf', '726170b4be8a2e4a9e8ce1d88170159799c705174b623b8e4d55472356f0f7a7', '5a971d3785153f696da23367eb7066798ddbeeca86367e9589eefd40d555878f', 1, '2026-01-27 07:09:25'),
+(48, 'SKP', '', '', 'haya-001-2026', 'Arsip Lainnya', 'private', 'ARSIP_20260127161142_859.pdf', '3e0a8bf22c7dde22cd83d8c0ff384cdfaaeaf83d762c8ccba2c94779ff6741c6', '2dfa4dbe7f00cef7a8c0bbf12b5a28457a8be06bd7fe5317d185feebbb14514c', 13, '2026-01-27 08:11:42');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `doc_signers`
+--
+
+CREATE TABLE `doc_signers` (
+  `id_sign` int(11) NOT NULL,
+  `id_doc` int(11) DEFAULT NULL,
+  `id_user` int(11) DEFAULT NULL,
+  `status` enum('pending','signed') DEFAULT 'pending',
+  `qr_token` varchar(255) DEFAULT NULL,
+  `posisi_x` float DEFAULT 0,
+  `posisi_y` float DEFAULT 0,
+  `halaman` int(11) DEFAULT 1,
+  `signed_at` datetime DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `doc_signers`
+--
+
+INSERT INTO `doc_signers` (`id_sign`, `id_doc`, `id_user`, `status`, `qr_token`, `posisi_x`, `posisi_y`, `halaman`, `signed_at`) VALUES
+(50, 38, 1, 'signed', 'ee5355c62e4ff02be709cd8706794fb3', 140.653, 222.17, 2, '2026-01-25 15:23:37'),
+(51, 38, 4, 'signed', 'ded7e68941de189e0bced9dbdcb0a26b', 35.825, 199.215, 2, '2026-01-25 15:27:49'),
+(52, 40, 2, 'signed', '4564e92513fe43150e56849ba88fda2a', 112.818, 52.9872, 5, '2026-01-25 15:57:52'),
+(53, 41, 2, 'signed', '009349b9de3ff85d5fc474ea57f3b573', 128.587, 262.537, 1, '2026-01-25 16:21:24'),
+(54, 39, 4, 'signed', '7187cc856f300412c56f464b64351453', 129.293, 261.479, 1, '2026-01-25 16:35:02'),
+(55, 41, 4, 'signed', '4e797f8d37ead0c2527681d2c1cf4682', 0, 265.642, 2, '2026-01-25 19:24:58'),
+(56, 41, 1, 'signed', '304d24eca8eed005dca289a44a81811f', 178.506, 265.642, 2, '2026-01-25 19:25:19'),
+(57, 41, 3, 'signed', 'fb0857263a3d1c080dbe7363d26584ba', 88.7236, 265.642, 2, '2026-01-25 19:25:32'),
+(58, 43, 1, 'signed', 'aefdfab0d3b58752c76d194bda2199b9', 134.938, 120.015, 1, '2026-01-25 20:05:23'),
+(59, 44, 3, 'signed', '53663ba4490762d9ec8fd43c842d0032', 134.232, 121.073, 1, '2026-01-25 20:07:54'),
+(60, 45, 1, 'signed', '29d41ff6effc7cc3e35e56baf1f7e952', 135.29, 119.662, 1, '2026-01-25 21:03:16'),
+(61, 40, 12, 'signed', 'a96e318f84db90904f4ebec2a7cdad3e', 142.452, 146.121, 6, '2026-01-25 22:14:56'),
+(62, 47, 1, 'signed', '71ec5a4f2508277ad8dcfeaeacab497c', 130.704, 255.482, 1, '2026-01-27 22:10:02'),
+(63, 47, 8, 'signed', 'bf142af7dbc19105fee57814c081af4c', 151.165, 255.129, 1, '2026-01-27 22:11:18'),
+(64, 47, 13, 'signed', '86bf2c5ad6d5f32e4cbb8d30a6b75c2f', 150.812, 137.301, 1, '2026-01-27 22:45:41'),
+(65, 48, 13, 'signed', 'd77a48c019bf16a2d672780fa1d33443', 135.996, 119.309, 1, '2026-01-27 23:12:03');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `users`
+--
+
+CREATE TABLE `users` (
+  `id_user` int(11) NOT NULL,
+  `username` varchar(50) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `nama_lengkap` varchar(100) DEFAULT NULL,
+  `nip` varchar(30) DEFAULT NULL,
+  `jabatan` varchar(100) DEFAULT NULL,
+  `unit_kerja` varchar(100) DEFAULT NULL,
+  `instansi` varchar(100) DEFAULT NULL,
+  `role` enum('admin','user','pic_admin','pic_keuangan','pic_ops','pic_sumberdaya') DEFAULT 'user',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `foto_path` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`id_user`, `username`, `password`, `nama_lengkap`, `nip`, `jabatan`, `unit_kerja`, `instansi`, `role`, `created_at`, `foto_path`) VALUES
+(1, 'admin', '202cb962ac59075b964b07152d234b70', 'IRFANDY DWI KUSUMA', '199903212020121002', 'Administrator Sistem', 'Kantor Pencarian dan Pertolongan Kelas A Kendari', 'Badan Nasional Pencarian dan Pertolongan', 'admin', '2026-01-10 08:38:00', 'PROFILE_1_20260127030947.png'),
+(8, 'irfandydk', '202cb962ac59075b964b07152d234b70', 'IRFANDY DWI KUSUMA', '199903212020121002', 'PRANATA PENCARIAN DAN PERTOLONGAN TERAMPIL', 'KANTOR PENCARIAN DAN PERTOLONGAN KELAS A KENDARI', 'BADAN NASIONAL PENCARIAN DAN PERTOLONGAN', 'user', '2026-01-25 13:05:13', NULL),
+(9, 'KEU', '202cb962ac59075b964b07152d234b70', 'FANDI FAHRUDDIN', '198505042010121001', 'BENDAHARA PENGELUARAN', 'KANTOR PENCARIAN DAN PERTOLONGAN KELAS A KENDARI', 'BADAN NASIONAL PENCARIAN DAN PERTOLONGAN', 'pic_keuangan', '2026-01-25 13:06:12', NULL),
+(10, 'OPS', '202cb962ac59075b964b07152d234b70', 'OPERASI SAR', '-', 'STAF OPERASI SAR', 'KANTOR PENCARIAN DAN PERTOLONGAN KELAS A KENDARI', 'BADAN NASIONAL PENCARIAN DAN PERTOLONGAN', 'pic_ops', '2026-01-25 13:08:24', NULL),
+(11, 'SDM', '202cb962ac59075b964b07152d234b70', 'SUMBERDAYA', '-', 'STAF SUMBERDAYA', 'KANTOR PENCARIAN DAN PERTOLONGAN KELAS A KENDARI', 'BADAN NASIONAL PENCARIAN DAN PERTOLONGAN', 'pic_sumberdaya', '2026-01-25 13:09:50', NULL),
+(12, 'ADM', '202cb962ac59075b964b07152d234b70', 'FAUZIAH', '197707142002121003', 'STAF ADMINISTRASI', 'KANTOR PENCARIAN DAN PERTOLONGAN KELAS A KENDARI', 'BADAN NASIONAL PENCARIAN DAN PERTOLONGAN', 'pic_admin', '2026-01-25 13:10:48', 'PROFILE_12_20260127030422.png'),
+(13, 'haya', '202cb962ac59075b964b07152d234b70', 'Nurhayati', '2000129319319123', 'Pranata Pencarian dan Pertolongan Pemula', 'Kantor Pencarian dan Pertolongan Kelas A Kendari', 'Badan Nasional Pencarian dan Pertolongan', 'user', '2026-01-27 14:33:04', 'PROFILE_13_20260127154448.png');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_change_requests`
+--
+
+CREATE TABLE `user_change_requests` (
+  `id_req` int(11) NOT NULL,
+  `id_user` int(11) NOT NULL,
+  `nama_lengkap` varchar(100) DEFAULT NULL,
+  `nip` varchar(50) DEFAULT NULL,
+  `jabatan` varchar(100) DEFAULT NULL,
+  `unit_kerja` varchar(100) DEFAULT NULL,
+  `instansi` varchar(100) DEFAULT NULL,
+  `password_baru` varchar(255) DEFAULT NULL,
+  `tgl_request` datetime DEFAULT current_timestamp(),
+  `foto_baru` varchar(255) DEFAULT NULL,
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `alasan_tolak` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `user_change_requests`
+--
+
+INSERT INTO `user_change_requests` (`id_req`, `id_user`, `nama_lengkap`, `nip`, `jabatan`, `unit_kerja`, `instansi`, `password_baru`, `tgl_request`, `foto_baru`, `status`, `alasan_tolak`) VALUES
+(5, 9, 'FANDI FAHRUDDIN', '198505042010121001', 'BENDAHARA PENGELUARAN', NULL, NULL, NULL, '2026-01-27 08:09:45', NULL, 'approved', NULL),
+(6, 12, 'FAUZIAH', '197707142002121003', 'STAF ADMINISTRASI', NULL, NULL, NULL, '2026-01-27 10:04:22', 'PROFILE_12_20260127030422.png', 'approved', NULL),
+(7, 13, 'Nurhayati', '12312931923919', 'Pranata Pencarian dan Pertolongan Pemula', NULL, NULL, NULL, '2026-01-27 22:34:23', 'PROFILE_13_20260127153423.jpeg', 'rejected', NULL),
+(8, 13, 'Nurhayati', '12312931923919', 'Pranata Pencarian dan Pertolongan Pemula', 'Kantor Pencarian dan Pertolongan Kelas A Kendari', 'Badan Nasional Pencarian dan Pertolongan', NULL, '2026-01-27 22:38:33', NULL, 'approved', NULL),
+(9, 13, 'Nurhayati', '2000129319319123', 'Pranata Pencarian dan Pertolongan Pemula', 'Kantor Pencarian dan Pertolongan Kelas A Kendari', 'Badan Nasional Pencarian dan Pertolongan', NULL, '2026-01-27 22:44:48', 'PROFILE_13_20260127154448.png', 'approved', NULL);
+
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table `app_settings`
+--
+ALTER TABLE `app_settings`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `documents`
+--
+ALTER TABLE `documents`
+  ADD PRIMARY KEY (`id_doc`);
+
+--
+-- Indexes for table `doc_signers`
+--
+ALTER TABLE `doc_signers`
+  ADD PRIMARY KEY (`id_sign`),
+  ADD KEY `id_doc` (`id_doc`);
+
+--
+-- Indexes for table `users`
+--
+ALTER TABLE `users`
+  ADD PRIMARY KEY (`id_user`);
+
+--
+-- Indexes for table `user_change_requests`
+--
+ALTER TABLE `user_change_requests`
+  ADD PRIMARY KEY (`id_req`),
+  ADD KEY `id_user` (`id_user`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `documents`
+--
+ALTER TABLE `documents`
+  MODIFY `id_doc` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=49;
+
+--
+-- AUTO_INCREMENT for table `doc_signers`
+--
+ALTER TABLE `doc_signers`
+  MODIFY `id_sign` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=66;
+
+--
+-- AUTO_INCREMENT for table `users`
+--
+ALTER TABLE `users`
+  MODIFY `id_user` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+
+--
+-- AUTO_INCREMENT for table `user_change_requests`
+--
+ALTER TABLE `user_change_requests`
+  MODIFY `id_req` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `doc_signers`
+--
+ALTER TABLE `doc_signers`
+  ADD CONSTRAINT `doc_signers_ibfk_1` FOREIGN KEY (`id_doc`) REFERENCES `documents` (`id_doc`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `user_change_requests`
+--
+ALTER TABLE `user_change_requests`
+  ADD CONSTRAINT `user_change_requests_ibfk_1` FOREIGN KEY (`id_user`) REFERENCES `users` (`id_user`) ON DELETE CASCADE;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
