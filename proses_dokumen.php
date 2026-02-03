@@ -7,33 +7,46 @@ if(!isset($_SESSION['status']) || $_SESSION['status'] != "login"){
     header("location:login.php?pesan=belum_login"); exit;
 }
 
-$role = $_SESSION['role'];
+$role = isset($_SESSION['role']) ? strtolower($_SESSION['role']) : 'user';
 $aksi = isset($_REQUEST['aksi']) ? $_REQUEST['aksi'] : ''; 
 
 // FUNGSI CEK HAK AKSES
 function is_allowed($role, $category){
     if($role == 'admin') return true;
+    
+    // Pastikan key role menggunakan huruf kecil semua
     $map = [
         'pic_admin'      => ['Surat Masuk', 'Surat Keluar', 'SK', 'Surat Perintah', 'Surat Pernyataan'],
         'pic_keuangan'   => ['Arsip Keuangan'],
         'pic_ops'        => ['Arsip Operasi SAR'],
         'pic_sumberdaya' => ['Arsip Sumberdaya'],
-        'user'           => ['Arsip Lainnya']
+        'user'           => ['Arsip Lainnya'] // Role default untuk user biasa
     ];
-    return (isset($map[$role]) && in_array($category, $map[$role]));
+    
+    // Cek apakah kategori ada dalam daftar role tersebut
+    if(isset($map[$role])){
+        return in_array($category, $map[$role]);
+    }
+    
+    // Default Tolak jika role tidak dikenali
+    return false;
 }
 
 // ----------------------------------------------------------------------
 // 1. PROSES SIMPAN BARU
 // ----------------------------------------------------------------------
-// PERBAIKAN: Menambahkan kondisi OR isset($_POST['simpan']) agar lebih robust
-if(($aksi == 'tambah' || isset($_POST['simpan'])) && isset($_POST['simpan'])){
+// LOGIKA BARU: Jika Metode POST DAN (aksi=tambah ATAU tombol simpan diklik)
+if($_SERVER['REQUEST_METHOD'] == 'POST' && ($aksi == 'tambah' || isset($_POST['simpan']))){
     
     $kategori = mysqli_real_escape_string($koneksi, $_POST['kategori']);
     
-    // Cek Hak Akses
+    // Validasi Hak Akses
     if(!is_allowed($role, $kategori)){
-        echo "<script>alert('AKSES DITOLAK! Kategori tidak diizinkan untuk Role Anda.'); window.location='tambah_dokumen.php';</script>"; exit;
+        echo "<script>
+            alert('AKSES DITOLAK! Role Anda ($role) tidak diizinkan untuk kategori ($kategori).'); 
+            window.location='tambah_dokumen.php';
+        </script>"; 
+        exit;
     }
 
     $nomor      = mysqli_real_escape_string($koneksi, $_POST['nomor']);
@@ -45,8 +58,8 @@ if(($aksi == 'tambah' || isset($_POST['simpan'])) && isset($_POST['simpan'])){
     $id_user    = $_SESSION['id_user'];
     $tgl_upload = date('Y-m-d H:i:s');
 
-    // LOGIC RETENSI
-    $retensi = isset($_POST['retensi']) ? $_POST['retensi'] : '5'; // Default 5 tahun jika kosong
+    // Logic Retensi
+    $retensi = isset($_POST['retensi']) ? $_POST['retensi'] : '5';
     if($retensi == 'permanen'){
         $tgl_retensi = '9999-12-31'; 
     } else {
@@ -80,13 +93,13 @@ if(($aksi == 'tambah' || isset($_POST['simpan'])) && isset($_POST['simpan'])){
                     echo "Error Database: " . mysqli_error($koneksi);
                 }
             } else {
-                echo "<script>alert('Gagal Upload File ke Folder!'); window.history.back();</script>";
+                echo "<script>alert('Gagal Upload File ke Server!'); window.history.back();</script>";
             }
         } else {
-            echo "<script>alert('Hanya File PDF yang diperbolehkan!'); window.history.back();</script>";
+            echo "<script>alert('Hanya File PDF!'); window.history.back();</script>";
         }
     } else {
-        echo "<script>alert('Silakan pilih file PDF!'); window.history.back();</script>";
+        echo "<script>alert('Pilih file PDF!'); window.history.back();</script>";
     }
 }
 
@@ -208,8 +221,9 @@ elseif($aksi == 'download_zip' && !empty($_POST['pilih'])){
         exit;
     }
 }
+
+// Fallback jika tidak ada aksi yang cocok
 else {
-    // Jika tidak ada aksi yang cocok, kembali ke halaman data
     header("location:data_dokumen.php");
 }
 ?>
