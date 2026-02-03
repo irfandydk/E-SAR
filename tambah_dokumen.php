@@ -7,7 +7,8 @@ if(!isset($_SESSION['status']) || $_SESSION['status'] != "login"){
 include 'config/koneksi.php';
 
 // --- LOGIKA HAK AKSES KATEGORI ---
-$role = $_SESSION['role'];
+// Normalisasi role ke huruf kecil untuk mencegah error case-sensitive
+$role = isset($_SESSION['role']) ? strtolower($_SESSION['role']) : 'user';
 $allowed_cats = [];
 
 // Definisi Hak Akses
@@ -22,7 +23,7 @@ if($role == 'admin'){
 } elseif($role == 'pic_sumberdaya'){
     $allowed_cats = ['Arsip Sumberdaya'];
 } else {
-    // User Biasa
+    // User Biasa (Default Fallback)
     $allowed_cats = ['Arsip Lainnya'];
 }
 
@@ -60,6 +61,7 @@ $selected_cat = isset($_GET['kategori']) ? $_GET['kategori'] : '';
                 <form action="proses_dokumen.php" method="POST" enctype="multipart/form-data">
                     
                     <input type="hidden" name="aksi" value="tambah">
+                    
                     <div class="mb-3">
                         <label class="form-label fw-bold">Kategori Dokumen</label>
                         <select name="kategori" id="kategoriSelect" class="form-select" onchange="updateForm()" required>
@@ -69,6 +71,7 @@ $selected_cat = isset($_GET['kategori']) ? $_GET['kategori'] : '';
                                      'Arsip Keuangan', 'Arsip Operasi SAR', 'Arsip Sumberdaya', 'Arsip Lainnya'];
                             
                             foreach($cats as $cat){
+                                // Logika Tampilan Dropdown
                                 if($allowed_cats === 'ALL' || in_array($cat, $allowed_cats)){
                                     $sel = ($selected_cat == $cat) ? 'selected' : '';
                                     echo "<option value='$cat' $sel>$cat</option>";
