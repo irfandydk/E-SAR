@@ -33,21 +33,19 @@ $halaman_awal = ($halaman>1) ? ($halaman * $batas) - $batas : 0;
 $nomor = $halaman_awal + 1;
 
 // --- MEMBANGUN QUERY ---
-// Base Condition
 $where = " WHERE 1=1 "; 
 
 // 1. FILTER PRIVASI
 if($role != 'admin'){
-    // User melihat dokumen publik OR milik sendiri
     $where .= " AND (d.visibility = 'public' OR d.id_user = '$id_user') ";
 }
 
 // 2. FILTER PENCARIAN
 if(!empty($cari)){
-    $where .= " AND (d.judul LIKE '%$cari%' OR d.nomor_surat LIKE '%$cari%' OR d.kategori LIKE '%$cari%') ";
+    $where .= " AND (d.judul LIKE '%$cari%' OR d.nomor_surat LIKE '%$cari%' OR d.kategori LIKE '%$cari%' OR d.asal_surat LIKE '%$cari%' OR d.tujuan_surat LIKE '%$cari%') ";
 }
 
-// 3. FILTER KATEGORI (Hanya jika ada di URL)
+// 3. FILTER KATEGORI
 if(!empty($kategori_filter)){
     $where .= " AND d.kategori = '$kategori_filter' ";
 }
@@ -125,7 +123,7 @@ $result = mysqli_query($koneksi, $query);
                             <?php } ?>
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
-                                <input type="text" name="cari" class="form-control border-start-0 bg-light" placeholder="Cari Judul / Nomor Surat..." value="<?php echo htmlspecialchars($cari); ?>">
+                                <input type="text" name="cari" class="form-control border-start-0 bg-light" placeholder="Cari Judul / Nomor / Asal / Tujuan..." value="<?php echo htmlspecialchars($cari); ?>">
                                 <button class="btn btn-primary" type="submit">Cari</button>
                             </div>
                         </form>
@@ -152,9 +150,22 @@ $result = mysqli_query($koneksi, $query);
                                     <th class="text-center" width="5%"><input type="checkbox" class="form-check-input" id="checkAll"></th>
                                     <th>No</th>
                                     <th>Nomor & Judul</th>
+                                    
+                                    <th width="20%">
+                                        <?php 
+                                        if($kategori_filter == 'Surat Masuk'){
+                                            echo "Asal Surat";
+                                        } elseif($kategori_filter == 'Surat Keluar'){
+                                            echo "Tujuan Surat";
+                                        } else {
+                                            echo "Asal / Tujuan";
+                                        }
+                                        ?>
+                                    </th>
+
                                     <th>Kategori</th>
                                     <th>Status / Exp</th>
-                                    <th class="text-center" width="20%">Aksi</th>
+                                    <th class="text-center" width="15%">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -179,6 +190,7 @@ $result = mysqli_query($koneksi, $query);
                                         <input type="checkbox" name="pilih[]" value="<?php echo $row['id_doc']; ?>" class="form-check-input check-item">
                                     </td>
                                     <td><?php echo $nomor++; ?></td>
+                                    
                                     <td>
                                         <div class="fw-bold text-dark text-truncate" style="max-width: 250px;">
                                             <?php echo htmlspecialchars($row['judul']); ?> <?php echo $vis; ?>
@@ -188,40 +200,47 @@ $result = mysqli_query($koneksi, $query);
                                             By: <?php echo $uploader; ?> • <?php echo date('d/m/Y', strtotime($row['created_at'])); ?>
                                         </div>
                                     </td>
+
+                                    <td>
+                                        <?php 
+                                        if($row['kategori'] == 'Surat Masuk'){
+                                            echo '<small class="text-muted d-block">Dari:</small>';
+                                            echo '<span class="fw-bold text-dark">'.(!empty($row['asal_surat']) ? htmlspecialchars($row['asal_surat']) : '-').'</span>';
+                                        } elseif($row['kategori'] == 'Surat Keluar'){
+                                            echo '<small class="text-muted d-block">Kepada:</small>';
+                                            echo '<span class="fw-bold text-dark">'.(!empty($row['tujuan_surat']) ? htmlspecialchars($row['tujuan_surat']) : '-').'</span>';
+                                        } else {
+                                            echo '<span class="text-muted">-</span>';
+                                        }
+                                        ?>
+                                    </td>
+
                                     <td>
                                         <span class="badge <?php echo getBadgeColor($row['kategori']); ?> rounded-pill fw-normal">
                                             <?php echo $row['kategori']; ?>
                                         </span>
                                     </td>
+
                                     <td>
                                         <?php echo $badge_retensi; ?><br>
                                         <small class="text-muted" style="font-size:10px;">
                                             Exp: <?php echo ($row['tgl_retensi']=='9999-12-31') ? '∞' : date('d/m/Y', strtotime($row['tgl_retensi'])); ?>
                                         </small>
                                     </td>
+
                                     <td class="text-center">
                                         <div class="btn-group" role="group">
                                             <button type="button" class="btn btn-sm btn-outline-primary" 
                                                     onclick="previewFile('<?php echo $path_file; ?>', '<?php echo htmlspecialchars($row['judul'], ENT_QUOTES); ?>')"
-                                                    title="Preview">
-                                                <i class="bi bi-eye"></i>
-                                            </button>
+                                                    title="Preview"><i class="bi bi-eye"></i></button>
 
-                                            <a href="<?php echo $path_file; ?>" download class="btn btn-sm btn-outline-success" title="Download">
-                                                <i class="bi bi-download"></i>
-                                            </a>
+                                            <a href="<?php echo $path_file; ?>" download class="btn btn-sm btn-outline-success" title="Download"><i class="bi bi-download"></i></a>
 
-                                            <a href="form_ttd.php?id=<?php echo $row['id_doc']; ?>" class="btn btn-sm btn-outline-dark" title="Tanda Tangan Elektronik">
-                                                <i class="bi bi-pen"></i>
-                                            </a>
+                                            <a href="form_ttd.php?id=<?php echo $row['id_doc']; ?>" class="btn btn-sm btn-outline-dark" title="Tanda Tangan"><i class="bi bi-pen"></i></a>
 
                                             <?php if($role == 'admin' || $row['id_user'] == $id_user) { ?>
-                                                <a href="edit_dokumen.php?id=<?php echo $row['id_doc']; ?>" class="btn btn-sm btn-outline-warning" title="Edit">
-                                                    <i class="bi bi-pencil"></i>
-                                                </a>
-                                                <a href="proses_dokumen.php?aksi=hapus&id=<?php echo $row['id_doc']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin hapus dokumen ini?')" title="Hapus">
-                                                    <i class="bi bi-trash"></i>
-                                                </a>
+                                                <a href="edit_dokumen.php?id=<?php echo $row['id_doc']; ?>" class="btn btn-sm btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>
+                                                <a href="proses_dokumen.php?aksi=hapus&id=<?php echo $row['id_doc']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin hapus?')" title="Hapus"><i class="bi bi-trash"></i></a>
                                             <?php } ?>
                                         </div>
                                     </td>
@@ -229,7 +248,7 @@ $result = mysqli_query($koneksi, $query);
                                 <?php 
                                     }
                                 } else {
-                                    echo "<tr><td colspan='6' class='text-center py-5 text-muted'>Tidak ada dokumen ditemukan.</td></tr>";
+                                    echo "<tr><td colspan='7' class='text-center py-5 text-muted'>Tidak ada dokumen ditemukan.</td></tr>";
                                 }
                                 ?>
                             </tbody>
@@ -292,7 +311,7 @@ $result = mysqli_query($koneksi, $query);
         document.getElementById('formBulk').submit();
     }
 
-    // FUNGSI PREVIEW FILE (SCRIPT YANG DIKEMBALIKAN)
+    // Preview File
     function previewFile(url, title) {
         var modal = new bootstrap.Modal(document.getElementById('previewModal'));
         document.getElementById('pdfFrame').src = url + "#toolbar=0"; 
