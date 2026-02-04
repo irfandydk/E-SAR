@@ -6,8 +6,6 @@ if(!isset($_SESSION['status']) || $_SESSION['status'] != "login"){
 }
 include 'config/koneksi.php';
 
-// --- LOGIKA HAK AKSES KATEGORI ---
-// Normalisasi role ke huruf kecil untuk mencegah error case-sensitive
 $role = isset($_SESSION['role']) ? strtolower($_SESSION['role']) : 'user';
 $allowed_cats = [];
 
@@ -23,7 +21,6 @@ if($role == 'admin'){
 } elseif($role == 'pic_sumberdaya'){
     $allowed_cats = ['Arsip Sumberdaya'];
 } else {
-    // User Biasa (Default Fallback)
     $allowed_cats = ['Arsip Lainnya'];
 }
 
@@ -71,7 +68,6 @@ $selected_cat = isset($_GET['kategori']) ? $_GET['kategori'] : '';
                                      'Arsip Keuangan', 'Arsip Operasi SAR', 'Arsip Sumberdaya', 'Arsip Lainnya'];
                             
                             foreach($cats as $cat){
-                                // Logika Tampilan Dropdown
                                 if($allowed_cats === 'ALL' || in_array($cat, $allowed_cats)){
                                     $sel = ($selected_cat == $cat) ? 'selected' : '';
                                     echo "<option value='$cat' $sel>$cat</option>";
@@ -105,8 +101,8 @@ $selected_cat = isset($_GET['kategori']) ? $_GET['kategori'] : '';
                         <select name="visibility" class="form-select">
                             <option value="public">Publik (Semua User Bisa Lihat)</option>
                             <option value="private">Private (Hanya Saya & Admin)</option>
-                            <option value="divisi">Hanya Divisi Saya</option>
                         </select>
+                        <div class="form-text">Pilih <b>Private</b> agar dokumen ini tersembunyi dari User lain dan PIC.</div>
                     </div>
 
                     <div class="mb-3 p-3 bg-light rounded border border-success-subtle">
