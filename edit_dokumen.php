@@ -7,22 +7,18 @@ if(!isset($_SESSION['status']) || $_SESSION['status'] != "login"){
     header("location:login.php?pesan=belum_login"); exit;
 }
 
-// Ambil ID dari URL
 $id_doc = mysqli_real_escape_string($koneksi, $_GET['id']);
 $id_user = $_SESSION['id_user'];
 $role    = $_SESSION['role'];
 
-// Query Data Lama
 $query = "SELECT * FROM documents WHERE id_doc = '$id_doc'";
 $result = mysqli_query($koneksi, $query);
 $d = mysqli_fetch_assoc($result);
 
-// Validasi Keberadaan Data
 if(!$d){
     echo "<script>alert('Dokumen tidak ditemukan!'); window.location='data_dokumen.php';</script>"; exit;
 }
 
-// Validasi Hak Akses (Hanya Admin atau Pemilik Dokumen yang boleh edit)
 if($role != 'admin' && $d['id_user'] != $id_user){
     echo "<script>alert('Anda tidak berhak mengedit dokumen ini!'); window.location='data_dokumen.php';</script>"; exit;
 }
@@ -100,8 +96,8 @@ if($role != 'admin' && $d['id_user'] != $id_user){
                         <select name="visibility" class="form-select">
                             <option value="public" <?php echo ($d['visibility']=='public')?'selected':''; ?>>Publik (Semua User Bisa Lihat)</option>
                             <option value="private" <?php echo ($d['visibility']=='private')?'selected':''; ?>>Private (Hanya Saya & Admin)</option>
-                            <option value="divisi" <?php echo ($d['visibility']=='divisi')?'selected':''; ?>>Hanya Divisi Saya</option>
                         </select>
+                        <div class="form-text">Jika sebelumnya tersetting "Divisi", silakan pilih ulang.</div>
                     </div>
 
                     <div class="mb-4 p-3 bg-light rounded border border-warning-subtle">
@@ -159,12 +155,10 @@ if($role != 'admin' && $d['id_user'] != $id_user){
         var boxTujuan = document.getElementById("boxTujuanSurat");
         var labelNomor = document.getElementById("labelNomor");
         
-        // Reset State
         boxAsal.style.display = "none";
         boxTujuan.style.display = "none";
         labelNomor.innerText = "Nomor Dokumen";
 
-        // Logic
         if(cat === "Surat Masuk"){ 
             boxAsal.style.display = "block"; 
             labelNomor.innerText = "Nomor Surat";
@@ -174,8 +168,6 @@ if($role != 'admin' && $d['id_user'] != $id_user){
             labelNomor.innerText = "Nomor Surat";
         }
     }
-    
-    // Jalankan saat halaman dimuat agar data lama tampil benar
     window.onload = updateForm;
 </script>
 </body>
