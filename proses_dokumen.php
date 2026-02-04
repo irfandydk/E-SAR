@@ -104,7 +104,7 @@ if($_SERVER['REQUEST_METHOD'] == 'POST' && ($aksi == 'tambah' || isset($_POST['s
 }
 
 // ----------------------------------------------------------------------
-// 2. PROSES UPDATE (Edit)
+// 2. PROSES UPDATE (Edit) - VERSI UPDATE DENGAN RETENSI
 // ----------------------------------------------------------------------
 elseif($aksi == 'update' && isset($_POST['update'])){
     
@@ -116,12 +116,42 @@ elseif($aksi == 'update' && isset($_POST['update'])){
     $asal       = isset($_POST['asal_surat']) ? mysqli_real_escape_string($koneksi, $_POST['asal_surat']) : NULL;
     $tujuan     = isset($_POST['tujuan_surat']) ? mysqli_real_escape_string($koneksi, $_POST['tujuan_surat']) : NULL;
 
-    $query_update = "UPDATE documents SET 
-                     nomor_surat='$nomor', judul='$judul', kategori='$kategori', visibility='$visibility',
-                     asal_surat='$asal', tujuan_surat='$tujuan'
-                     WHERE id_doc='$id_doc'";
-    mysqli_query($koneksi, $query_update);
+    // --- LOGIKA UPDATE RETENSI ---
+    $retensi_upd = $_POST['retensi_update'];
+    $sql_retensi = ""; // String tambahan query
 
+    if($retensi_upd != 'tetap'){
+        // Ambil tgl_upload asli dulu untuk kalkulasi
+        $q_old = mysqli_query($koneksi, "SELECT created_at FROM documents WHERE id_doc='$id_doc'");
+        $d_old = mysqli_fetch_assoc($q_old);
+        $tgl_dasar = $d_old['created_at']; // Basis perhitungan dari tanggal upload awal
+
+        if($retensi_upd == 'permanen'){
+            $new_tgl_retensi = '9999-12-31';
+        } else {
+            $new_tgl_retensi = date('Y-m-d', strtotime($tgl_dasar . " +$retensi_upd years"));
+        }
+        
+        // Update status juga jika tanggal berubah (otomatis jadi aktif lagi jika diperpanjang)
+        $sql_retensi = ", tgl_retensi='$new_tgl_retensi', status_retensi='aktif' ";
+    }
+
+    // QUERY UPDATE UTAMA
+    $query_update = "UPDATE documents SET 
+                     nomor_surat='$nomor', 
+                     judul='$judul', 
+                     kategori='$kategori', 
+                     visibility='$visibility',
+                     asal_surat='$asal', 
+                     tujuan_surat='$tujuan'
+                     $sql_retensi 
+                     WHERE id_doc='$id_doc'";
+    
+    if(!mysqli_query($koneksi, $query_update)){
+        echo "Error Update Data: " . mysqli_error($koneksi); exit;
+    }
+
+    // CEK UPLOAD FILE BARU (GANTI FILE)
     if(!empty($_FILES['file_dokumen']['name'])){
         $filename = $_FILES['file_dokumen']['name'];
         $tmp_name = $_FILES['file_dokumen']['tmp_name'];
@@ -129,6 +159,11 @@ elseif($aksi == 'update' && isset($_POST['update'])){
 
         if($ext == 'pdf'){
             $target_dir = "uploads/doc_asli/";
+            // Hapus file lama dulu (opsional, biar bersih)
+            $q_path = mysqli_query($koneksi, "SELECT file_path FROM documents WHERE id_doc='$id_doc'");
+            $d_path = mysqli_fetch_assoc($q_path);
+            if(file_exists($target_dir.$d_path['file_path'])) unlink($target_dir.$d_path['file_path']);
+
             $clean_cat = strtoupper(substr(str_replace(' ', '', $kategori), 0, 5));
             $new_filename = $clean_cat . "_" . date('YmdHis') . "_" . rand(100,999) . ".pdf";
             $path_upload  = $target_dir . $new_filename;
@@ -227,3 +262,4 @@ else {
     header("location:data_dokumen.php");
 }
 ?>
+
