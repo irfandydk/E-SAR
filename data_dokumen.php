@@ -32,16 +32,13 @@ $halaman = isset($_GET['halaman']) ? (int)$_GET['halaman'] : 1;
 $halaman_awal = ($halaman>1) ? ($halaman * $batas) - $batas : 0;
 $nomor = $halaman_awal + 1;
 
-// --- MEMBANGUN QUERY UTAMA (CORE FIX) ---
-// Kita gunakan alias d (documents) dan u (users)
-// LEFT JOIN: Agar jika user dihapus, dokumen tetap tampil (dengan nama uploader kosong)
+// --- MEMBANGUN QUERY ---
+// Base Condition
+$where = " WHERE 1=1 "; 
 
-$where = " WHERE 1=1 "; // Base condition
-
-// 1. FILTER PRIVASI (VISIBILITY)
+// 1. FILTER PRIVASI
 if($role != 'admin'){
-    // User biasa/PIC melihat: Dokumen Publik ATAU Dokumen Milik Sendiri
-    // Logika ini menjamin dokumen yang baru diupload (milik sendiri) PASTI MUNCUL
+    // User melihat dokumen publik OR milik sendiri
     $where .= " AND (d.visibility = 'public' OR d.id_user = '$id_user') ";
 }
 
@@ -50,20 +47,19 @@ if(!empty($cari)){
     $where .= " AND (d.judul LIKE '%$cari%' OR d.nomor_surat LIKE '%$cari%' OR d.kategori LIKE '%$cari%') ";
 }
 
-// 3. FILTER KATEGORI (Dari URL / Sidebar)
+// 3. FILTER KATEGORI (Hanya jika ada di URL)
 if(!empty($kategori_filter)){
     $where .= " AND d.kategori = '$kategori_filter' ";
 }
 
-// --- EKSEKUSI QUERY ---
-// Hitung Total Data (untuk Pagination)
+// Hitung Total Data
 $query_total = "SELECT count(*) as total FROM documents d $where";
 $result_total = mysqli_query($koneksi, $query_total);
 $row_total = mysqli_fetch_assoc($result_total);
 $total_data = $row_total['total'];
 $total_halaman = ceil($total_data / $batas);
 
-// Ambil Data Halaman Ini
+// Ambil Data Utama
 $query = "SELECT d.*, u.nama_lengkap 
           FROM documents d 
           LEFT JOIN users u ON d.id_user = u.id_user 
@@ -71,11 +67,6 @@ $query = "SELECT d.*, u.nama_lengkap
           ORDER BY d.created_at DESC 
           LIMIT $halaman_awal, $batas";
 $result = mysqli_query($koneksi, $query);
-
-// Cek error query
-if(!$result) {
-    die("Query Error: " . mysqli_error($koneksi));
-}
 ?>
 
 <!DOCTYPE html>
@@ -127,7 +118,6 @@ if(!$result) {
         <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
             <div class="card-header bg-white py-3">
                 <div class="row g-2 align-items-center">
-                    
                     <div class="col-md-6">
                         <form action="" method="GET">
                             <?php if(!empty($kategori_filter)){ ?>
@@ -140,7 +130,6 @@ if(!$result) {
                             </div>
                         </form>
                     </div>
-
                     <div class="col-md-6 text-md-end">
                         <button type="button" class="btn btn-outline-success btn-sm rounded-pill" onclick="submitBulk('download_zip')">
                             <i class="bi bi-file-zip me-1"></i> Download ZIP
@@ -160,14 +149,12 @@ if(!$result) {
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th class="text-center" width="5%">
-                                        <input type="checkbox" class="form-check-input" id="checkAll">
-                                    </th>
+                                    <th class="text-center" width="5%"><input type="checkbox" class="form-check-input" id="checkAll"></th>
                                     <th>No</th>
                                     <th>Nomor & Judul</th>
                                     <th>Kategori</th>
-                                    <th>Pengunggah</th>
-                                    <th class="text-center">Aksi</th>
+                                    <th>Status / Exp</th>
+                                    <th class="text-center" width="20%">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -175,13 +162,17 @@ if(!$result) {
                                 if(mysqli_num_rows($result) > 0){
                                     while($row = mysqli_fetch_assoc($result)){
                                         
-                                        // Badge Visibility
                                         $vis = ($row['visibility']=='public') 
                                             ? '<i class="bi bi-globe text-success" title="Publik"></i>' 
                                             : '<i class="bi bi-lock-fill text-danger" title="Private"></i>';
                                         
-                                        // Nama Uploader
-                                        $uploader = !empty($row['nama_lengkap']) ? $row['nama_lengkap'] : '<span class="text-muted fst-italic">User Dihapus</span>';
+                                        $uploader = !empty($row['nama_lengkap']) ? $row['nama_lengkap'] : 'User Dihapus';
+                                        $path_file = "uploads/doc_asli/" . $row['file_path'];
+
+                                        // Badge Status Retensi
+                                        $badge_retensi = ($row['status_retensi'] == 'aktif') 
+                                            ? '<span class="badge bg-success bg-opacity-10 text-success">Aktif</span>'
+                                            : '<span class="badge bg-danger bg-opacity-10 text-danger">Inaktif</span>';
                                 ?>
                                 <tr>
                                     <td class="text-center">
@@ -189,27 +180,48 @@ if(!$result) {
                                     </td>
                                     <td><?php echo $nomor++; ?></td>
                                     <td>
-                                        <div class="fw-bold text-dark mb-1"><?php echo htmlspecialchars($row['judul']); ?> <?php echo $vis; ?></div>
-                                        <small class="text-muted bg-light px-2 py-1 rounded border"><?php echo htmlspecialchars($row['nomor_surat']); ?></small>
+                                        <div class="fw-bold text-dark text-truncate" style="max-width: 250px;">
+                                            <?php echo htmlspecialchars($row['judul']); ?> <?php echo $vis; ?>
+                                        </div>
+                                        <small class="text-muted border px-2 rounded bg-light"><?php echo htmlspecialchars($row['nomor_surat']); ?></small>
+                                        <div class="small text-muted fst-italic mt-1" style="font-size: 11px;">
+                                            By: <?php echo $uploader; ?> • <?php echo date('d/m/Y', strtotime($row['created_at'])); ?>
+                                        </div>
                                     </td>
                                     <td>
-                                        <span class="badge <?php echo getBadgeColor($row['kategori']); ?> rounded-pill fw-normal px-3">
+                                        <span class="badge <?php echo getBadgeColor($row['kategori']); ?> rounded-pill fw-normal">
                                             <?php echo $row['kategori']; ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <div class="small fw-bold text-dark"><?php echo $uploader; ?></div>
-                                        <div class="small text-muted" style="font-size: 0.75rem;">
-                                            <?php echo date('d M Y H:i', strtotime($row['created_at'])); ?>
-                                        </div>
+                                        <?php echo $badge_retensi; ?><br>
+                                        <small class="text-muted" style="font-size:10px;">
+                                            Exp: <?php echo ($row['tgl_retensi']=='9999-12-31') ? '∞' : date('d/m/Y', strtotime($row['tgl_retensi'])); ?>
+                                        </small>
                                     </td>
                                     <td class="text-center">
-                                        <div class="btn-group">
-                                            <a href="uploads/doc_asli/<?php echo $row['file_path']; ?>" target="_blank" class="btn btn-sm btn-outline-primary" title="Lihat"><i class="bi bi-eye"></i></a>
-                                            
+                                        <div class="btn-group" role="group">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                    onclick="previewFile('<?php echo $path_file; ?>', '<?php echo htmlspecialchars($row['judul'], ENT_QUOTES); ?>')"
+                                                    title="Preview">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+
+                                            <a href="<?php echo $path_file; ?>" download class="btn btn-sm btn-outline-success" title="Download">
+                                                <i class="bi bi-download"></i>
+                                            </a>
+
+                                            <a href="form_ttd.php?id=<?php echo $row['id_doc']; ?>" class="btn btn-sm btn-outline-dark" title="Tanda Tangan Elektronik">
+                                                <i class="bi bi-pen"></i>
+                                            </a>
+
                                             <?php if($role == 'admin' || $row['id_user'] == $id_user) { ?>
-                                                <a href="edit_dokumen.php?id=<?php echo $row['id_doc']; ?>" class="btn btn-sm btn-outline-warning" title="Edit"><i class="bi bi-pencil"></i></a>
-                                                <a href="proses_dokumen.php?aksi=hapus&id=<?php echo $row['id_doc']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin hapus dokumen ini?')" title="Hapus"><i class="bi bi-trash"></i></a>
+                                                <a href="edit_dokumen.php?id=<?php echo $row['id_doc']; ?>" class="btn btn-sm btn-outline-warning" title="Edit">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                                <a href="proses_dokumen.php?aksi=hapus&id=<?php echo $row['id_doc']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Yakin hapus dokumen ini?')" title="Hapus">
+                                                    <i class="bi bi-trash"></i>
+                                                </a>
                                             <?php } ?>
                                         </div>
                                     </td>
@@ -223,7 +235,8 @@ if(!$result) {
                             </tbody>
                         </table>
                     </div>
-                </form> </div>
+                </form>
+            </div>
 
             <div class="card-footer bg-white py-3">
                 <nav>
@@ -231,13 +244,11 @@ if(!$result) {
                         <li class="page-item <?php if($halaman <= 1) echo 'disabled'; ?>">
                             <a class="page-link" href="?halaman=<?php echo $halaman-1; ?>&cari=<?php echo $cari; ?>&kategori=<?php echo $kategori_filter; ?>">Prev</a>
                         </li>
-                        
                         <?php for($x=1; $x<=$total_halaman; $x++){ ?>
                             <li class="page-item <?php if($halaman == $x) echo 'active'; ?>">
                                 <a class="page-link" href="?halaman=<?php echo $x; ?>&cari=<?php echo $cari; ?>&kategori=<?php echo $kategori_filter; ?>"><?php echo $x; ?></a>
                             </li>
                         <?php } ?>
-                        
                         <li class="page-item <?php if($halaman >= $total_halaman) echo 'disabled'; ?>">
                             <a class="page-link" href="?halaman=<?php echo $halaman+1; ?>&cari=<?php echo $cari; ?>&kategori=<?php echo $kategori_filter; ?>">Next</a>
                         </li>
@@ -249,30 +260,44 @@ if(!$result) {
     </div>
 </div>
 
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 overflow-hidden">
+            <div class="modal-header bg-dark text-white py-2">
+                <h6 class="modal-title" id="previewTitle"><i class="bi bi-file-pdf me-2"></i>Preview Dokumen</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" style="height: 85vh; background: #525659;">
+                <iframe id="pdfFrame" src="" width="100%" height="100%" style="border:none;"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Script Checkbox All
+    // Check All
     document.getElementById('checkAll').addEventListener('change', function() {
         var checkboxes = document.querySelectorAll('.check-item');
-        for (var checkbox of checkboxes) {
-            checkbox.checked = this.checked;
-        }
+        for (var checkbox of checkboxes) { checkbox.checked = this.checked; }
     });
 
-    // Script Submit Bulk Action
+    // Bulk Action
     function submitBulk(action) {
         var checkedCount = document.querySelectorAll('.check-item:checked').length;
-        if(checkedCount === 0){
-            alert('Pilih minimal satu dokumen!');
-            return;
-        }
-        
-        if(action === 'hapus_banyak'){
-            if(!confirm('Yakin ingin menghapus ' + checkedCount + ' dokumen yang dipilih?')) return;
-        }
+        if(checkedCount === 0){ alert('Pilih minimal satu dokumen!'); return; }
+        if(action === 'hapus_banyak' && !confirm('Yakin hapus ' + checkedCount + ' dokumen terpilih?')) return;
 
         document.getElementById('bulkAksi').value = action;
         document.getElementById('formBulk').submit();
+    }
+
+    // FUNGSI PREVIEW FILE (SCRIPT YANG DIKEMBALIKAN)
+    function previewFile(url, title) {
+        var modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        document.getElementById('pdfFrame').src = url + "#toolbar=0"; 
+        document.getElementById('previewTitle').innerText = "Preview: " + title;
+        modal.show();
     }
 </script>
 </body>
